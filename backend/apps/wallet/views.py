@@ -1,0 +1,36 @@
+from rest_framework import generics
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.views import APIView
+
+from core.responses import success_response
+
+from .models import Salary, Wallet
+from .serializers import SalarySerializer, WalletSerializer
+from .services import SalaryService, WalletService
+
+
+class WalletView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        svc = WalletService()
+        wallet = svc.get_or_create_wallet(request.user)
+        return success_response(data=WalletSerializer(wallet).data)
+
+
+class SalaryListCreateView(generics.ListCreateAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = SalarySerializer
+
+    def get_queryset(self):
+        return Salary.objects.filter(user=self.request.user)
+
+    def list(self, request, *args, **kwargs):
+        return success_response(data=SalarySerializer(self.get_queryset(), many=True).data)
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        svc = SalaryService()
+        salary = svc.register(request.user, serializer.validated_data)
+        return success_response(data=SalarySerializer(salary).data, message="Salário registrado.", status=201)

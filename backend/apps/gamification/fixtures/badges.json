@@ -1,0 +1,6 @@
+[
+  {"model": "gamification.badge", "pk": "00000000-0000-0000-0001-000000000001", "fields": {"name": "Organizado", "description": "Registrou 10 transações", "icon": "check-circle", "xp_reward": 50, "condition_type": "transaction_count", "condition_value": 10, "created_at": "2026-01-01T00:00:00Z"}},
+  {"model": "gamification.badge", "pk": "00000000-0000-0000-0001-000000000002", "fields": {"name": "Economista", "description": "Acumulou 500 XP", "icon": "piggy-bank", "xp_reward": 100, "condition_type": "xp_threshold", "condition_value": 500, "created_at": "2026-01-01T00:00:00Z"}},
+  {"model": "gamification.badge", "pk": "00000000-0000-0000-0001-000000000003", "fields": {"name": "Mestre das Metas", "description": "Concluiu 5 metas", "icon": "target", "xp_reward": 200, "condition_type": "goals_completed", "condition_value": 5, "created_at": "2026-01-01T00:00:00Z"}},
+  {"model": "gamification.badge", "pk": "00000000-0000-0000-0001-000000000004", "fields": {"name": "Casal Exemplar", "description": "Acumulou 1000 XP juntos", "icon": "heart", "xp_reward": 300, "condition_type": "xp_threshold", "condition_value": 1000, "created_at": "2026-01-01T00:00:00Z"}}
+]
