@@ -41,12 +41,12 @@ import { Card } from "./components/ui/card";
 import { Input } from "./components/ui/input";
 import { Progress } from "./components/ui/progress";
 import {
+  api,
   apiErrorMessage,
   ApiAuthError,
-  apiRequest,
+  ApiResponse,
   AuthPayload,
   BadgeAward,
-  body,
   Category,
   clearSession,
   CoupleGroup,
@@ -54,7 +54,6 @@ import {
   Debt,
   FixedExpense,
   Goal,
-  patchBody,
   RankingItem,
   PublicProfile,
   readSession,
@@ -285,7 +284,7 @@ function AuthScreen({
     setLoading(true);
     try {
       const payload = mode === "login" ? { email, password } : { name, email, password };
-      const response = await apiRequest<AuthPayload>(`/auth/${mode === "login" ? "login" : "register"}/`, body(payload));
+      const response = await api.post<ApiResponse<AuthPayload>>(`/auth/${mode === "login" ? "login" : "register"}/`, payload).then(r => r.data);
       onAuth(response.data);
       if (mode === "register") {
         onRegistered(response.data.user.email);
@@ -309,7 +308,7 @@ function AuthScreen({
         setLoading(true);
         setError("");
         try {
-          const googleResponse = await apiRequest<AuthPayload>("/auth/google/", body({ id_token: response.credential }));
+          const googleResponse = await api.post<ApiResponse<AuthPayload>>("/auth/google/", { id_token: response.credential }).then(r => r.data);
           onAuth(googleResponse.data);
         } catch (err) {
           if (!cancelled) {
@@ -451,7 +450,7 @@ function VerificationScreen({
     if (verifyCalledRef.current) return;
     verifyCalledRef.current = true;
 
-    apiRequest<unknown>(`/auth/verify-email/${token}/`)
+    api.get<ApiResponse<unknown>>(`/auth/verify-email/${token}/`).then(r => r.data)
       .then(async (response) => {
         setStatus("verified");
         setMessage(response.message || "E-mail verificado com sucesso.");
@@ -467,7 +466,7 @@ function VerificationScreen({
     setResending(true);
     setMessage("");
     try {
-      const response = await apiRequest<unknown>("/auth/resend-verification/", body({ email: resendEmail }));
+      const response = await api.post<ApiResponse<unknown>>("/auth/resend-verification/", { email: resendEmail }).then(r => r.data);
       setMessage(response.message || "Se o e-mail estiver cadastrado, o link será reenviado.");
       setStatus("pending");
     } catch (err) {
@@ -821,7 +820,7 @@ function WalletPage({ token, data, refresh }: FormProps) {
     event.preventDefault();
     setError("");
     try {
-      await apiRequest<Salary>("/wallet/salary/", body({ amount: salary, effective_date: date, note }), token);
+      await api.post("/wallet/salary/", { amount: salary, effective_date: date, note });
       setSalary("");
       setNote("");
       await refresh();
@@ -885,7 +884,7 @@ function TransactionsPage({ token, data, refresh }: FormProps) {
     }
     setError("");
     try {
-      await apiRequest<Transaction>("/transactions/", body({
+      await api.post("/transactions/", {
         amount: form.amount,
         type: form.type,
         description: form.description,
@@ -893,7 +892,7 @@ function TransactionsPage({ token, data, refresh }: FormProps) {
         is_recurring: form.is_recurring,
         category: form.category || null,
         wallet: data.wallet.id,
-      }), token);
+      });
       setForm({ amount: "", type: "expense", description: "", date: today(), category: "", is_recurring: false });
       await refresh();
     } catch (err) {
@@ -946,7 +945,7 @@ function CategoriesPage({ token, data, refresh }: FormProps) {
     event.preventDefault();
     setError("");
     try {
-      await apiRequest<Category>("/categories/", body(form), token);
+      await api.post("/categories/", form);
       setForm({ name: "", type: "expense", icon: "", color: "#7C3AED" });
       await refresh();
     } catch (err) {
@@ -994,7 +993,7 @@ function GoalsPage({ token, data, refresh }: FormProps) {
     event.preventDefault();
     setError("");
     try {
-      await apiRequest<Goal>("/goals/", body({ ...form, deadline: form.deadline || null, couple_group: data.couple?.id ?? null }), token);
+      await api.post("/goals/", { ...form, deadline: form.deadline || null, couple_group: data.couple?.id ?? null });
       setForm({ name: "", target_amount: "", current_amount: "0", deadline: "" });
       await refresh();
     } catch (err) {
@@ -1005,7 +1004,7 @@ function GoalsPage({ token, data, refresh }: FormProps) {
   async function makeDeposit(goal: Goal) {
     const amount = deposit[goal.id];
     if (!amount) return;
-    await apiRequest<Goal>(`/goals/${goal.id}/deposit/`, body({ amount }), token);
+    await api.post(`/goals/${goal.id}/deposit/`, { amount });
     setDeposit({ ...deposit, [goal.id]: "" });
     await refresh();
   }
@@ -1046,7 +1045,7 @@ function DebtsPage({ token, data, refresh }: FormProps) {
     event.preventDefault();
     setError("");
     try {
-      await apiRequest<Debt>("/debts/", body({ ...form, due_date: form.due_date || null }), token);
+      await api.post("/debts/", { ...form, due_date: form.due_date || null });
       setForm({ creditor: "", amount: "", paid_amount: "0", due_date: "", description: "" });
       await refresh();
     } catch (err) {
@@ -1081,7 +1080,7 @@ function FixedExpensesPage({ token, data, refresh }: FormProps) {
     event.preventDefault();
     setError("");
     try {
-      await apiRequest<FixedExpense>("/fixed-expenses/", body({ ...form, category: form.category || null }), token);
+      await api.post("/fixed-expenses/", { ...form, category: form.category || null });
       setForm({ name: "", amount: "", due_day: "1", category: "" });
       await refresh();
     } catch (err) {
@@ -1090,7 +1089,7 @@ function FixedExpensesPage({ token, data, refresh }: FormProps) {
   }
 
   async function markPaid(item: FixedExpense) {
-    await apiRequest<FixedExpense>(`/fixed-expenses/${item.id}/pay/`, { method: "POST" }, token);
+    await api.post(`/fixed-expenses/${item.id}/pay/`);
     await refresh();
   }
 
@@ -1134,7 +1133,7 @@ function CouplePage({ token, data, refresh, user }: FormProps & { user: User }) 
     event.preventDefault();
     setError("");
     try {
-      await apiRequest<CoupleGroup>("/couples/", body({ name: groupName }), token);
+      await api.post("/couples/", { name: groupName });
       setGroupName("");
       await refresh();
     } catch (err) {
@@ -1146,7 +1145,7 @@ function CouplePage({ token, data, refresh, user }: FormProps & { user: User }) 
     event.preventDefault();
     setError("");
     try {
-      await apiRequest<CoupleGroup>("/couples/join/", body({ invite_code: inviteCode }), token);
+      await api.post("/couples/join/", { invite_code: inviteCode });
       setInviteCode("");
       await refresh();
     } catch (err) {
@@ -1370,7 +1369,7 @@ function ProfilePage({
     setSaving(true);
     setError("");
     try {
-      const response = await apiRequest<User>("/users/me/", patchBody({ name, date_of_birth: dateOfBirth || null, avatar }), token);
+      const response = await api.patch<ApiResponse<User>>("/users/me/", { name, date_of_birth: dateOfBirth || null, avatar }).then(r => r.data);
       updateSessionUser(response.data);
       onUserChange(response.data);
       await refresh();
@@ -1617,7 +1616,7 @@ function SocialPage({ token, user }: { token: string; user: User }) {
         try {
           const search = query.trim();
           const path = search ? `/users/profiles/?search=${encodeURIComponent(search)}` : "/users/profiles/";
-          const response = await apiRequest<PublicProfile[]>(path, {}, token);
+          const response = await api.get<ApiResponse<PublicProfile[]>>(path).then(r => r.data);
           if (cancelled) return;
           setProfiles(response.data);
         } catch (err) {
@@ -1752,7 +1751,7 @@ export function App() {
 
   const refreshCurrentUser = useCallback(async () => {
     if (!session) return null;
-    const response = await apiRequest<User>("/users/me/", {}, session.access);
+    const response = await api.get<ApiResponse<User>>("/users/me/").then(r => r.data);
     updateSessionUser(response.data);
     setSession((current) => (current ? { ...current, user: response.data } : current));
     return response.data;
@@ -1771,7 +1770,7 @@ export function App() {
     let cancelled = false;
     (async () => {
       try {
-        const me = await apiRequest<User>("/users/me/", {}, session.access);
+        const me = await api.get<ApiResponse<User>>("/users/me/").then(r => r.data);
         if (cancelled) return;
         updateSessionUser(me.data);
         setSession((current) => (current ? { ...current, user: me.data } : current));
@@ -1800,7 +1799,7 @@ export function App() {
     setLoading(true);
     setError("");
     try {
-      const me = await apiRequest<User>("/users/me/", {}, token);
+      const me = await api.get<ApiResponse<User>>("/users/me/").then(r => r.data);
       const [
         dashboard,
         couple,
@@ -1816,19 +1815,19 @@ export function App() {
         xpHistory,
         ranking,
       ] = await Promise.all([
-        apiRequest<Dashboard>("/dashboard/", {}, token),
-        apiRequest<CoupleGroup | Record<string, never>>("/couples/", {}, token),
-        apiRequest<AppData["coupleDashboard"]>("/dashboard/couple/", {}, token),
-        apiRequest<Wallet>("/wallet/", {}, token),
-        apiRequest<Salary[]>("/wallet/salary/", {}, token),
-        apiRequest<Category[]>("/categories/", {}, token),
-        apiRequest<Transaction[]>("/transactions/", {}, token),
-        apiRequest<Goal[]>("/goals/", {}, token),
-        apiRequest<Debt[]>("/debts/", {}, token),
-        apiRequest<FixedExpense[]>("/fixed-expenses/", {}, token),
-        apiRequest<BadgeAward[]>("/gamification/badges/", {}, token),
-        apiRequest<XPHistory[]>("/gamification/xp/", {}, token),
-        apiRequest<RankingItem[]>("/gamification/ranking/", {}, token),
+        api.get<ApiResponse<Dashboard>>("/dashboard/").then(r => r.data),
+        api.get<ApiResponse<CoupleGroup | Record<string, never>>>("/couples/").then(r => r.data),
+        api.get<ApiResponse<AppData["coupleDashboard"]>>("/dashboard/couple/").then(r => r.data),
+        api.get<ApiResponse<Wallet>>("/wallet/").then(r => r.data),
+        api.get<ApiResponse<Salary[]>>("/wallet/salary/").then(r => r.data),
+        api.get<ApiResponse<Category[]>>("/categories/").then(r => r.data),
+        api.get<ApiResponse<Transaction[]>>("/transactions/").then(r => r.data),
+        api.get<ApiResponse<Goal[]>>("/goals/").then(r => r.data),
+        api.get<ApiResponse<Debt[]>>("/debts/").then(r => r.data),
+        api.get<ApiResponse<FixedExpense[]>>("/fixed-expenses/").then(r => r.data),
+        api.get<ApiResponse<BadgeAward[]>>("/gamification/badges/").then(r => r.data),
+        api.get<ApiResponse<XPHistory[]>>("/gamification/xp/").then(r => r.data),
+        api.get<ApiResponse<RankingItem[]>>("/gamification/ranking/").then(r => r.data),
       ]);
 
       const group = isCoupleGroup(couple.data) ? couple.data : null;

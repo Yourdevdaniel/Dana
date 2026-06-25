@@ -1,4 +1,11 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "/api";
+import axios from "axios";
+
+export const api = axios.create({
+  baseURL: import.meta.env.VITE_API_BASE_URL ?? "https://dana-8kpu.onrender.com/api",
+  withCredentials: true,
+});
+
+// ── Types ────────────────────────────────────────────────────────────────────
 
 export type ApiError = { field: string; message: string };
 
@@ -25,6 +32,8 @@ export type AuthPayload = {
   access: string;
   refresh: string;
 };
+
+export type Session = AuthPayload;
 
 export type CoupleGroup = {
   id: string;
@@ -163,23 +172,13 @@ export type PublicProfile = {
   created_at: string;
 };
 
-export type Session = AuthPayload;
-
-export class ApiAuthError extends Error {
-  status: number;
-
-  constructor(message: string, status: number) {
-    super(message);
-    this.name = "ApiAuthError";
-    this.status = status;
-  }
-}
-
 export type ProfileUpdatePayload = {
   name?: string;
   avatar?: string | null;
   date_of_birth?: string | null;
 };
+
+// ── Session helpers ───────────────────────────────────────────────────────────
 
 const ACCESS_KEY = "finance-couple:access";
 const REFRESH_KEY = "finance-couple:refresh";
@@ -211,56 +210,68 @@ export function clearSession() {
   localStorage.removeItem(USER_KEY);
 }
 
-export function apiErrorMessage(error: unknown) {
-  return error instanceof Error ? error.message : "Nao foi possivel concluir a operacao.";
-}
+// ── Error helpers ─────────────────────────────────────────────────────────────
 
-export async function apiRequest<T>(
-  path: string,
-  options: RequestInit = {},
-  accessToken?: string,
-): Promise<ApiResponse<T>> {
-  const hasFormData = typeof FormData !== "undefined" && options.body instanceof FormData;
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...options,
-    headers: {
-      ...(!hasFormData ? { "Content-Type": "application/json" } : {}),
-      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-      ...options.headers,
-    },
-  });
-
-  const payload = (await response.json().catch(() => ({
-    success: false,
-    data: {},
-    message: "Nao foi possivel concluir a operacao.",
-    errors: [],
-  }))) as ApiResponse<T>;
-
-  if (!response.ok || !payload.success) {
-    let message = payload.message || "Nao foi possivel concluir a operacao.";
-    const errors = payload.errors;
-    if (Array.isArray(errors) && errors.length > 0) {
-      const first = errors[0] as Record<string, unknown>;
-      if (first && typeof first.message === "string") {
-        message = first.message;
-      }
-    } else if (typeof errors === "string") {
-      message = errors;
-    }
-    if (response.status === 401 && accessToken) {
-      throw new ApiAuthError(message, response.status);
-    }
-    throw new Error(message);
+export class ApiAuthError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "ApiAuthError";
+    this.status = status;
   }
-
-  return payload;
 }
 
-export function body(data: Record<string, unknown>): RequestInit {
-  return { method: "POST", body: JSON.stringify(data) };
+export function apiErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "Não foi possível concluir a operação.";
 }
 
-export function patchBody(data: Record<string, unknown>): RequestInit {
-  return { method: "PATCH", body: JSON.stringify(data) };
+function extractMessage(payload: ApiResponse<unknown>): string {
+  let message = payload.message || "Não foi possível concluir a operação.";
+  const errors = payload.errors;
+  if (Array.isArray(errors) && errors.length > 0) {
+    const first = errors[0] as Record<string, unknown>;
+    if (first && typeof first.message === "string") message = first.message;
+  } else if (typeof errors === "string" && errors) {
+    message = errors;
+  }
+  return message;
 }
+
+// ── Interceptors ──────────────────────────────────────────────────────────────
+
+api.interceptors.request.use((config) => {
+  const session = readSession();
+  if (session?.access) {
+    config.headers.Authorization = `Bearer ${session.access}`;
+  }
+  return config;
+});
+
+api.interceptors.response.use(
+  (response) => {
+    const payload = response.data as ApiResponse<unknown>;
+    if (payload && !payload.success) {
+      return Promise.reject(new Error(extractMessage(payload)));
+    }
+    return response;
+  },
+  (error) => {
+    if (axios.isAxiosError(error)) {
+      const status = error.response?.status;
+      const payload = error.response?.data as ApiResponse<unknown> | undefined;
+
+      if (status === 401) {
+        clearSession();
+        return Promise.reject(new ApiAuthError(
+          payload ? extractMessage(payload) : "Sessão expirada.",
+          401,
+        ));
+      }
+
+      if (payload) {
+        return Promise.reject(new Error(extractMessage(payload)));
+      }
+    }
+    return Promise.reject(error instanceof Error ? error : new Error("Não foi possível concluir a operação."));
+  },
+);
