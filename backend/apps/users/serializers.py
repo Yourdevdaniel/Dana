@@ -58,8 +58,8 @@ class PublicProfileSerializer(serializers.ModelSerializer):
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ["id", "email", "name", "avatar", "date_of_birth", "total_xp", "is_email_verified", "created_at"]
-        read_only_fields = ["id", "total_xp", "is_email_verified", "created_at"]
+        fields = ["id", "email", "name", "avatar", "date_of_birth", "total_xp", "created_at"]
+        read_only_fields = ["id", "total_xp", "created_at"]
 
 
 class UserUpdateSerializer(serializers.ModelSerializer):
