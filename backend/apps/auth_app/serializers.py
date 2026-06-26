@@ -30,11 +30,6 @@ class LoginSerializer(serializers.Serializer):
                 cache.set(lock_key, True, timeout=_LOCK_SECONDS)
             raise serializers.ValidationError("Credenciais inválidas.")
 
-        if not user.is_email_verified:
-            raise serializers.ValidationError(
-                "Verifique seu email antes de fazer login. Acesse sua caixa de entrada."
-            )
-
         cache.delete(fail_key)
         cache.delete(lock_key)
         attrs["user"] = user

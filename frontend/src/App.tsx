@@ -217,33 +217,6 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-function FlowErrorScreen({
-  title,
-  message,
-  actionLabel = "Voltar para a página inicial",
-}: {
-  title: string;
-  message: string;
-  actionLabel?: string;
-}) {
-  return (
-    <main className="grid min-h-screen place-items-center bg-background px-4 py-10 text-slate-100">
-      <Card className="w-full max-w-xl p-5 sm:p-6">
-        <div className="grid gap-4">
-          <div>
-            <p className="text-sm font-medium text-pink-200">Erro</p>
-            <h1 className="mt-1 text-2xl font-semibold text-white">{title}</h1>
-            <p className="mt-2 text-sm text-slate-400">{message}</p>
-          </div>
-          <Button type="button" className="w-full sm:w-auto" onClick={() => window.location.assign("/")}>
-            {actionLabel}
-          </Button>
-        </div>
-      </Card>
-    </main>
-  );
-}
-
 function NativeSelect(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
   return (
     <select
@@ -258,10 +231,8 @@ function NativeSelect(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
 
 function AuthScreen({
   onAuth,
-  onRegistered,
 }: {
   onAuth: (session: Session) => void;
-  onRegistered: (email: string) => void;
 }) {
   const [mode, setMode] = useState<"login" | "register">("login");
   const [name, setName] = useState("");
@@ -286,9 +257,6 @@ function AuthScreen({
       const payload = mode === "login" ? { email, password } : { name, email, password };
       const response = await api.post<ApiResponse<AuthPayload>>(`/auth/${mode === "login" ? "login" : "register"}/`, payload).then(r => r.data);
       onAuth(response.data);
-      if (mode === "register") {
-        onRegistered(response.data.user.email);
-      }
     } catch (err) {
       setError(apiErrorMessage(err));
     } finally {
@@ -420,128 +388,6 @@ function AuthScreen({
   );
 }
 
-function VerificationScreen({
-  email,
-  token,
-  onBack,
-  onRefreshStatus,
-}: {
-  email: string;
-  token?: string | null;
-  onBack: () => void;
-  onRefreshStatus: () => Promise<void>;
-}) {
-  const [status, setStatus] = useState<"checking" | "pending" | "verified" | "expired" | "error">(token ? "checking" : "pending");
-  const [message, setMessage] = useState("");
-  const [resendEmail, setResendEmail] = useState(email);
-  const [resending, setResending] = useState(false);
-  const verifyCalledRef = useRef(false);
-
-  useEffect(() => {
-    setResendEmail(email);
-  }, [email]);
-
-  useEffect(() => {
-    if (!token) {
-      setStatus("pending");
-      return;
-    }
-    // useRef impede chamada dupla do React StrictMode em desenvolvimento
-    if (verifyCalledRef.current) return;
-    verifyCalledRef.current = true;
-
-    api.get<ApiResponse<unknown>>(`/auth/verify-email/${token}/`).then(r => r.data)
-      .then(async (response) => {
-        setStatus("verified");
-        setMessage(response.message || "E-mail verificado com sucesso.");
-        await onRefreshStatus();
-      })
-      .catch((err: unknown) => {
-        setStatus("error");
-        setMessage(apiErrorMessage(err));
-      });
-  }, [onRefreshStatus, token]);
-
-  async function resend() {
-    setResending(true);
-    setMessage("");
-    try {
-      const response = await api.post<ApiResponse<unknown>>("/auth/resend-verification/", { email: resendEmail }).then(r => r.data);
-      setMessage(response.message || "Se o e-mail estiver cadastrado, o link será reenviado.");
-      setStatus("pending");
-    } catch (err) {
-      setMessage(apiErrorMessage(err));
-    } finally {
-      setResending(false);
-    }
-  }
-
-  if (status === "error") {
-    return (
-      <FlowErrorScreen
-        title="Link inválido ou expirado"
-        message={message || "Este link não é válido ou expirou. Solicite um novo link abaixo."}
-      />
-    );
-  }
-
-  return (
-    <main className="grid min-h-screen place-items-center bg-background px-4 py-10 text-slate-100">
-      <Card className="w-full max-w-xl p-5 sm:p-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold text-white">Verificação de e-mail</h1>
-            <p className="mt-1 text-sm text-slate-400">Confirme sua conta para liberar o acesso completo.</p>
-          </div>
-          <Button type="button" variant="ghost" onClick={onBack}>
-            Voltar
-          </Button>
-        </div>
-
-        <div className="mt-6 rounded-md border border-white/10 bg-white/[0.03] p-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-sm text-slate-400">Conta</p>
-              <p className="font-medium text-white">{resendEmail || email}</p>
-            </div>
-              <span
-                className={cn(
-                  "rounded-full px-3 py-1 text-xs font-semibold",
-                  status === "verified"
-                    ? "bg-emerald-500/15 text-emerald-300"
-                    : "bg-amber-500/15 text-amber-200",
-                )}
-              >
-              {status === "verified" ? "Verificada" : status === "checking" ? "Validando" : "Pendente"}
-            </span>
-          </div>
-          <p className="mt-3 text-sm text-slate-300">
-            {status === "verified"
-              ? "Sua conta já está validada. Você pode entrar no app."
-              : "Use o link enviado por email para validar a conta. Se precisar, reenvie o link abaixo."}
-          </p>
-          {message && <p className="mt-3 text-sm text-slate-400">{message}</p>}
-        </div>
-
-        {status !== "verified" && (
-          <div className="mt-6 grid gap-3">
-            <Field label="E-mail para reenvio">
-              <Input value={resendEmail} onChange={(event) => setResendEmail(event.target.value)} type="email" />
-            </Field>
-            <div className="grid gap-2 sm:flex">
-              <Button type="button" onClick={resend} disabled={resending || !resendEmail}>
-                {resending ? "Reenviando" : "Reenviar link"}
-              </Button>
-              <Button type="button" variant="secondary" onClick={onRefreshStatus}>
-                Já verifiquei
-              </Button>
-            </div>
-          </div>
-        )}
-      </Card>
-    </main>
-  );
-}
 
 function MetricGrid({ dashboard }: { dashboard: Dashboard | null }) {
   const metrics = [
@@ -1730,23 +1576,13 @@ export function App() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [pendingVerificationEmail, setPendingVerificationEmail] = useState<string>("");
 
   const token = session?.access ?? "";
-  const verificationToken = useMemo(() => {
-    if (typeof window === "undefined") return null;
-    const match = window.location.pathname.match(/^\/verify-email\/([^/]+)$/);
-    return match?.[1] ? decodeURIComponent(match[1]) : null;
-  }, []);
 
   const handleAuth = useCallback((nextSession: Session) => {
     saveSession(nextSession);
     setSession(nextSession);
     setAuthState("authenticated");
-  }, []);
-
-  const handleRegistered = useCallback((email: string) => {
-    setPendingVerificationEmail(email);
   }, []);
 
   const refreshCurrentUser = useCallback(async () => {
@@ -1863,35 +1699,16 @@ export function App() {
   }, [token]);
 
   useEffect(() => {
-    if (authState !== "authenticated" || !session?.user.is_email_verified) return;
+    if (authState !== "authenticated") return;
     void loadData();
-  }, [authState, loadData, session?.user.is_email_verified]);
+  }, [authState, loadData]);
 
   const title = useMemo(() => navigation.find((item) => item.id === page)?.label ?? "Dashboard", [page]);
-
-  if (verificationToken) {
-    return (
-      <VerificationScreen
-        email={pendingVerificationEmail || session?.user.email || ""}
-        token={verificationToken}
-        onBack={() => {
-          window.location.assign("/");
-        }}
-        onRefreshStatus={async () => {
-          const current = await refreshCurrentUser();
-          if (current?.is_email_verified) {
-            setAuthState("authenticated");
-          }
-        }}
-      />
-    );
-  }
 
   if (!session) {
     return (
       <AuthScreen
         onAuth={handleAuth}
-        onRegistered={handleRegistered}
       />
     );
   }
@@ -1906,28 +1723,12 @@ export function App() {
     );
   }
 
-  if (!session.user.is_email_verified) {
-    return (
-      <VerificationScreen
-        email={pendingVerificationEmail || session.user.email}
-        onBack={logout}
-        onRefreshStatus={async () => {
-          const current = await refreshCurrentUser();
-          if (current?.is_email_verified) {
-            setAuthState("authenticated");
-          }
-        }}
-      />
-    );
-  }
-
   const displayName = coupleDisplayName(session.user, data.couple);
 
   function logout() {
     clearSession();
     setSession(null);
     setData(emptyData);
-    setPendingVerificationEmail("");
     setMobileMenuOpen(false);
   }
 

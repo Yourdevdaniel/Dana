@@ -6,8 +6,6 @@ from .views import (
     LoginView,
     LogoutView,
     RegisterView,
-    ResendVerificationView,
-    VerifyEmailView,
 )
 
 urlpatterns = [
@@ -15,7 +13,5 @@ urlpatterns = [
     path("login/", LoginView.as_view(), name="auth-login"),
     path("logout/", LogoutView.as_view(), name="auth-logout"),
     path("refresh/", TokenRefreshView.as_view(), name="auth-refresh"),
-    path("verify-email/<str:token>/", VerifyEmailView.as_view(), name="auth-verify-email"),
-    path("resend-verification/", ResendVerificationView.as_view(), name="auth-resend-verification"),
     path("google/", GoogleLoginView.as_view(), name="auth-google"),
 ]

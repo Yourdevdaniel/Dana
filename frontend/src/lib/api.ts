@@ -22,7 +22,6 @@ export type User = {
   avatar: string | null;
   date_of_birth: string | null;
   total_xp: number;
-  is_email_verified: boolean;
   created_at: string;
 };
 

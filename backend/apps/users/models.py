@@ -1,10 +1,7 @@
-import secrets
 import uuid
-from datetime import timedelta
 
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from django.db import models
-from django.utils import timezone
 
 
 class UserManager(BaseUserManager):
@@ -39,9 +36,6 @@ class User(AbstractBaseUser, PermissionsMixin):
     total_xp = models.PositiveIntegerField(default=0)
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
-    is_email_verified = models.BooleanField(default=False)
-    email_verification_token = models.CharField(max_length=64, null=True, blank=True)
-    email_verification_expires = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -56,12 +50,6 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     def __str__(self):
         return self.email
-
-    def generate_verification_token(self):
-        self.email_verification_token = secrets.token_urlsafe(48)
-        self.email_verification_expires = timezone.now() + timedelta(hours=24)
-        self.save(update_fields=["email_verification_token", "email_verification_expires"])
-        return self.email_verification_token
 
     def add_xp(self, amount: int, reason: str, reference_id: str = ""):
         from apps.gamification.services import XPService
