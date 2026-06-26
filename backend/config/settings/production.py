@@ -9,7 +9,7 @@ DEBUG = False
 
 ALLOWED_HOSTS = [
     host.strip()
-    for host in os.getenv("ALLOWED_HOSTS", "").split(",")
+    for host in os.getenv("ALLOWED_HOSTS", "dana-8kpu.onrender.com").split(",")
     if host.strip()
 ]
 
@@ -22,14 +22,10 @@ _db_url = config("DATABASE_URL", default=None)
 if _db_url:
     DATABASES = {"default": dj_database_url.parse(_db_url, conn_max_age=600, ssl_require=True)}  # noqa: F405
 
-# CORS — só sobrescreve base.py se a variável estiver definida no ambiente
-_cors_raw = os.getenv("CORS_ALLOWED_ORIGINS", "")
-if _cors_raw.strip():
-    CORS_ALLOWED_ORIGINS = [o.strip() for o in _cors_raw.split(",") if o.strip()]  # noqa: F405
-
-_csrf_raw = os.getenv("CSRF_TRUSTED_ORIGINS", _cors_raw)
-if _csrf_raw.strip():
-    CSRF_TRUSTED_ORIGINS = [o.strip() for o in _csrf_raw.split(",") if o.strip()]
+# CORS — usa env var se definida; fallback garante o domínio do Vercel
+_cors_raw = os.getenv("CORS_ALLOWED_ORIGINS", "https://dana-two-alpha.vercel.app")
+CORS_ALLOWED_ORIGINS = [o.strip() for o in _cors_raw.split(",") if o.strip()]  # noqa: F405
+CSRF_TRUSTED_ORIGINS = list(CORS_ALLOWED_ORIGINS)
 
 # Segurança HTTPS
 SECURE_SSL_REDIRECT = True
