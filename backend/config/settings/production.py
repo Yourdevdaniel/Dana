@@ -22,18 +22,14 @@ _db_url = config("DATABASE_URL", default=None)
 if _db_url:
     DATABASES = {"default": dj_database_url.parse(_db_url, conn_max_age=600, ssl_require=True)}  # noqa: F405
 
-# CORS — lê da variável de ambiente, suporta múltiplas origens separadas por vírgula
-CORS_ALLOWED_ORIGINS = [
-    origin.strip()
-    for origin in os.getenv("CORS_ALLOWED_ORIGINS", "").split(",")
-    if origin.strip()
-]
+# CORS — só sobrescreve base.py se a variável estiver definida no ambiente
+_cors_raw = os.getenv("CORS_ALLOWED_ORIGINS", "")
+if _cors_raw.strip():
+    CORS_ALLOWED_ORIGINS = [o.strip() for o in _cors_raw.split(",") if o.strip()]  # noqa: F405
 
-CSRF_TRUSTED_ORIGINS = [
-    origin.strip()
-    for origin in os.getenv("CORS_ALLOWED_ORIGINS", "").split(",")
-    if origin.strip()
-]
+_csrf_raw = os.getenv("CSRF_TRUSTED_ORIGINS", _cors_raw)
+if _csrf_raw.strip():
+    CSRF_TRUSTED_ORIGINS = [o.strip() for o in _csrf_raw.split(",") if o.strip()]
 
 # Segurança HTTPS
 SECURE_SSL_REDIRECT = True
