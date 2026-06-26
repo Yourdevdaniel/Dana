@@ -19,10 +19,7 @@ def api_client():
 
 @pytest.fixture
 def user(db):
-    u = User.objects.create_user(email="user@test.com", name="Test User", password="pass1234")
-    u.is_email_verified = True
-    u.save(update_fields=["is_email_verified"])
-    return u
+    return User.objects.create_user(email="user@test.com", name="Test User", password="pass1234")
 
 
 @pytest.fixture
