@@ -1,7 +1,6 @@
 import os
 
 import dj_database_url
-from decouple import config
 
 from .base import *  # noqa: F401, F403
 
@@ -18,7 +17,7 @@ MIDDLEWARE.insert(2, "whitenoise.middleware.WhiteNoiseMiddleware")  # noqa: F405
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 # PostgreSQL via DATABASE_URL (Render fornece automaticamente)
-_db_url = config("DATABASE_URL", default=None)
+_db_url = os.getenv("DATABASE_URL")
 if _db_url:
     DATABASES = {"default": dj_database_url.parse(_db_url, conn_max_age=600, ssl_require=True)}  # noqa: F405
 

@@ -14,7 +14,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-# v2 - bust cache
+# v3 - bust cache
 # collectstatic não precisa de banco, só de SECRET_KEY
 RUN SECRET_KEY=build-dummy-key ALLOWED_HOSTS=* \
     python manage.py collectstatic --noinput
