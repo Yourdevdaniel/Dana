@@ -9,6 +9,7 @@ import {
   ChevronLeft,
   ChevronRight,
   CircleDollarSign,
+  Clock3,
   CreditCard,
   HandCoins,
   HelpCircle,
@@ -26,9 +27,11 @@ import {
   Settings2,
   Target,
   Trophy,
+  Send,
   UserRoundPlus,
   UserRoundSearch,
   UserCircle2,
+  Users,
   Trash2,
   Upload,
   Wallet as WalletIcon,
@@ -94,9 +97,32 @@ declare global {
   }
 }
 
-type Page = "dashboard" | "wallet" | "transactions" | "categories" | "goals" | "investments" | "debts" | "fixed" | "couple" | "achievements" | "profile" | "social";
+type Page = "dashboard" | "wallet" | "transactions" | "categories" | "goals" | "investments" | "debts" | "fixed" | "couple" | "achievements" | "profile" | "social" | "friends";
 type DashboardMode = "solo" | "couple";
 type InvestmentAssetType = "renda_fixa" | "acoes" | "fundos" | "cripto" | "exterior" | "outros";
+
+type ProfilePrivacySettings = {
+  showGroupOnProfile: boolean;
+  showMembershipOnOtherProfiles: boolean;
+};
+
+type LocalFriend = {
+  id: string;
+  name: string;
+  avatar: string | null;
+  total_xp: number;
+  status: "pending" | "accepted";
+  created_at: string;
+};
+
+type ScheduledNudge = {
+  id: string;
+  to_user_id: string;
+  to_name: string;
+  message: string;
+  deliver_at: string;
+  created_at: string;
+};
 
 type Investment = {
   id: string;
@@ -167,13 +193,14 @@ const navigation = [
   { id: "achievements", label: "Conquistas", icon: Trophy },
   { id: "profile", label: "Perfil", icon: UserCircle2 },
   { id: "social", label: "Rede", icon: UserRoundSearch },
+  { id: "friends", label: "Amizades", icon: Users },
 ] satisfies Array<{ id: Page; label: string; icon: typeof LayoutDashboard }>;
 
 const navigationSections = [
   { id: "overview", label: "Visão geral", pages: ["dashboard", "wallet"] },
   { id: "money", label: "Movimentações", pages: ["transactions", "categories", "fixed"] },
   { id: "plans", label: "Planos", pages: ["goals", "investments", "debts"] },
-  { id: "people", label: "Social", pages: ["couple", "achievements", "profile", "social"] },
+  { id: "people", label: "Social", pages: ["couple", "achievements", "profile", "social", "friends"] },
 ] satisfies Array<{ id: string; label: string; pages: Page[] }>;
 
 const pageHelp: Record<Page, { title: string; body: string; terms: string[] }> = {
@@ -237,6 +264,11 @@ const pageHelp: Record<Page, { title: string; body: string; terms: string[] }> =
     body: "Mostra os usuários com mais XP total e sua posição quando você aparece no top 10.",
     terms: ["XP total: soma dos pontos ganhos.", "Ranking: lista ordenada do maior XP para o menor."],
   },
+  friends: {
+    title: "Amizades",
+    body: "Veja amigos, pedidos enviados e envie pequenos incentivos para ajudar alguém a continuar.",
+    terms: ["Pedido pendente: convite enviado e ainda não aceito.", "Incentivo: mensagem curta enviada agora ou agendada para depois."],
+  },
 };
 
 const monthFormatter = new Intl.DateTimeFormat("pt-BR", { month: "short" });
@@ -277,6 +309,60 @@ function readInvestments(userId: string): Investment[] {
 
 function saveInvestments(userId: string, investments: Investment[]) {
   localStorage.setItem(investmentStorageKey(userId), JSON.stringify(investments));
+}
+
+function profilePrivacyStorageKey(userId: string) {
+  return `finance-couple:profile-privacy:${userId}`;
+}
+
+function readProfilePrivacy(userId: string): ProfilePrivacySettings {
+  try {
+    const raw = localStorage.getItem(profilePrivacyStorageKey(userId));
+    return raw ? { showGroupOnProfile: true, showMembershipOnOtherProfiles: true, ...JSON.parse(raw) } : {
+      showGroupOnProfile: true,
+      showMembershipOnOtherProfiles: true,
+    };
+  } catch {
+    return { showGroupOnProfile: true, showMembershipOnOtherProfiles: true };
+  }
+}
+
+function saveProfilePrivacy(userId: string, settings: ProfilePrivacySettings) {
+  localStorage.setItem(profilePrivacyStorageKey(userId), JSON.stringify(settings));
+}
+
+function friendsStorageKey(userId: string) {
+  return `finance-couple:friends:${userId}`;
+}
+
+function readLocalFriends(userId: string): LocalFriend[] {
+  try {
+    const raw = localStorage.getItem(friendsStorageKey(userId));
+    return raw ? (JSON.parse(raw) as LocalFriend[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveLocalFriends(userId: string, friends: LocalFriend[]) {
+  localStorage.setItem(friendsStorageKey(userId), JSON.stringify(friends));
+}
+
+function nudgesStorageKey(userId: string) {
+  return `finance-couple:nudges:${userId}`;
+}
+
+function readScheduledNudges(userId: string): ScheduledNudge[] {
+  try {
+    const raw = localStorage.getItem(nudgesStorageKey(userId));
+    return raw ? (JSON.parse(raw) as ScheduledNudge[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveScheduledNudges(userId: string, nudges: ScheduledNudge[]) {
+  localStorage.setItem(nudgesStorageKey(userId), JSON.stringify(nudges));
 }
 
 function coupleAvatarStorageKey(coupleId: string) {
@@ -1929,6 +2015,7 @@ function ProfilePage({
   const [avatar, setAvatar] = useState<string | null>(profile.avatar);
   const [avatarLabel, setAvatarLabel] = useState(profile.avatar ? "Imagem atual" : "Nenhum arquivo selecionado");
   const [featuredBadgeIds, setFeaturedBadgeIds] = useState<string[]>([]);
+  const [privacySettings, setPrivacySettings] = useState<ProfilePrivacySettings>(() => readProfilePrivacy(profile.id));
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState("");
@@ -1958,6 +2045,10 @@ function ProfilePage({
       // keep local-only state best-effort
     }
   }, [featuredBadgeIds, featuredStorageKey]);
+
+  useEffect(() => {
+    setPrivacySettings(readProfilePrivacy(profile.id));
+  }, [profile.id]);
 
   const profileAchievementStats = useMemo(
     () => ({
@@ -2031,6 +2122,19 @@ function ProfilePage({
     setFeaturedBadgeIds((current) =>
       current.includes(badgeId) ? current.filter((id) => id !== badgeId) : [...current, badgeId],
     );
+  }
+
+  async function updatePrivacySettings(nextSettings: ProfilePrivacySettings) {
+    setPrivacySettings(nextSettings);
+    saveProfilePrivacy(profile.id, nextSettings);
+    try {
+      await api.patch("/users/me/privacy/", {
+        show_group_on_profile: nextSettings.showGroupOnProfile,
+        show_membership_on_other_profiles: nextSettings.showMembershipOnOtherProfiles,
+      });
+    } catch {
+      // Backend persistence is optional for now; local settings keep the UI behavior.
+    }
   }
 
   async function deleteAccount() {
@@ -2162,6 +2266,30 @@ function ProfilePage({
               <Field label="Data de nascimento">
                 <Input value={dateOfBirth} onChange={(event) => setDateOfBirth(event.target.value)} type="date" />
               </Field>
+              <div className="grid gap-3 rounded-md border border-white/10 bg-white/[0.03] p-4">
+                <div>
+                  <p className="text-sm font-medium text-white">Privacidade do grupo</p>
+                  <p className="mt-1 text-xs text-slate-400">Escolha se outras pessoas podem ver sua ligação com o casal/grupo.</p>
+                </div>
+                <label className="flex items-start gap-3 text-sm text-slate-300">
+                  <input
+                    className="mt-1"
+                    type="checkbox"
+                    checked={privacySettings.showGroupOnProfile}
+                    onChange={(event) => void updatePrivacySettings({ ...privacySettings, showGroupOnProfile: event.target.checked })}
+                  />
+                  <span>Mostrar meu grupo no meu perfil público.</span>
+                </label>
+                <label className="flex items-start gap-3 text-sm text-slate-300">
+                  <input
+                    className="mt-1"
+                    type="checkbox"
+                    checked={privacySettings.showMembershipOnOtherProfiles}
+                    onChange={(event) => void updatePrivacySettings({ ...privacySettings, showMembershipOnOtherProfiles: event.target.checked })}
+                  />
+                  <span>Permitir que eu apareça como integrante nos perfis do meu grupo.</span>
+                </label>
+              </div>
               <div className="grid gap-2">
                 <span className="text-sm text-slate-300">Foto de perfil</span>
                 <div className="grid gap-3 rounded-md border border-dashed border-white/10 bg-white/[0.03] p-4">
@@ -2321,11 +2449,13 @@ function PublicProfileModal({
   profileId,
   currentUser,
   localBadges,
+  currentGroup,
   onClose,
 }: {
   profileId: string | null;
   currentUser: User;
   localBadges: BadgeAward[];
+  currentGroup: CoupleGroup | null;
   onClose: () => void;
 }) {
   const [profile, setProfile] = useState<PublicProfile | null>(null);
@@ -2368,6 +2498,10 @@ function PublicProfileModal({
   const badges = profile?.id === currentUser.id
     ? localBadges.filter((item) => localFeaturedBadgeIds.includes(item.id))
     : profile?.featured_badges ?? [];
+  const currentUserPrivacy = readProfilePrivacy(currentUser.id);
+  const visibleGroup = profile?.id === currentUser.id
+    ? currentUserPrivacy.showGroupOnProfile ? profile.public_group ?? currentGroup : null
+    : profile?.show_group_on_profile ? profile.public_group : null;
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 px-4 py-8" role="dialog" aria-modal="true">
@@ -2417,6 +2551,21 @@ function PublicProfileModal({
                 <EmptyState title="Nenhuma badge pública em destaque." />
               )}
             </div>
+            {visibleGroup && (
+              <div>
+                <h3 className="mb-3 text-sm font-semibold text-white">Grupo</h3>
+                <div className="flex items-center gap-3 rounded-md bg-white/[0.04] p-3">
+                  <div className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-md bg-white/5">
+                    {visibleGroup.avatar ? (
+                      <img src={visibleGroup.avatar} alt={visibleGroup.name} className="h-full w-full object-cover" />
+                    ) : (
+                      <span className="text-sm font-semibold text-white">{userInitials(visibleGroup.name)}</span>
+                    )}
+                  </div>
+                  <p className="truncate text-sm font-medium text-white">{visibleGroup.name}</p>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </Card>
@@ -2481,6 +2630,213 @@ function SocialPage({ ranking, user, onViewProfile }: { ranking: RankingItem[]; 
             </button>
           )}
         />
+      </Card>
+    </div>
+  );
+}
+
+function FriendsPage({ ranking, user, onViewProfile }: { ranking: RankingItem[]; user: User; onViewProfile: (userId: string) => void }) {
+  const [friends, setFriends] = useState<LocalFriend[]>(() => readLocalFriends(user.id));
+  const [nudges, setNudges] = useState<ScheduledNudge[]>(() => readScheduledNudges(user.id));
+  const [selectedFriendId, setSelectedFriendId] = useState("");
+  const [message, setMessage] = useState("Continue, você está indo muito bem!");
+  const [delayMinutes, setDelayMinutes] = useState("30");
+  const [status, setStatus] = useState("");
+  const acceptedFriends = friends.filter((friend) => friend.status === "accepted");
+  const pendingFriends = friends.filter((friend) => friend.status === "pending");
+  const discoverable = ranking
+    .filter((item) => item.user.id !== user.id)
+    .filter((item) => !friends.some((friend) => friend.id === item.user.id));
+
+  function persistFriends(nextFriends: LocalFriend[]) {
+    setFriends(nextFriends);
+    saveLocalFriends(user.id, nextFriends);
+  }
+
+  function persistNudges(nextNudges: ScheduledNudge[]) {
+    setNudges(nextNudges);
+    saveScheduledNudges(user.id, nextNudges);
+  }
+
+  async function sendFriendRequest(target: User) {
+    const nextFriend: LocalFriend = {
+      id: target.id,
+      name: target.name,
+      avatar: target.avatar,
+      total_xp: target.total_xp,
+      status: "pending",
+      created_at: new Date().toISOString(),
+    };
+    persistFriends([nextFriend, ...friends]);
+    setStatus(`Pedido enviado para ${target.name}.`);
+    try {
+      await api.post("/community/friend-requests/", { to_user_id: target.id });
+    } catch {
+      setStatus(`Pedido salvo localmente. O backend ainda precisa confirmar o envio para ${target.name}.`);
+    }
+  }
+
+  function acceptLocalFriend(friend: LocalFriend) {
+    persistFriends(friends.map((item) => item.id === friend.id ? { ...item, status: "accepted" } : item));
+    setStatus(`${friend.name} agora aparece como amizade.`);
+  }
+
+  function removeFriend(friend: LocalFriend) {
+    persistFriends(friends.filter((item) => item.id !== friend.id));
+    setStatus(`${friend.name} removido da lista local.`);
+  }
+
+  async function sendNudge(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const friend = friends.find((item) => item.id === selectedFriendId);
+    if (!friend || !message.trim()) return;
+    const deliverAt = new Date(Date.now() + Number(delayMinutes) * 60 * 1000).toISOString();
+    const nextNudge: ScheduledNudge = {
+      id: crypto.randomUUID(),
+      to_user_id: friend.id,
+      to_name: friend.name,
+      message: message.trim(),
+      deliver_at: deliverAt,
+      created_at: new Date().toISOString(),
+    };
+    persistNudges([nextNudge, ...nudges]);
+    setStatus(`Incentivo agendado para ${friend.name}.`);
+    try {
+      await api.post("/community/nudges/", {
+        to_user_id: friend.id,
+        message: nextNudge.message,
+        deliver_at: nextNudge.deliver_at,
+      });
+    } catch {
+      setStatus(`Incentivo salvo localmente. O backend ainda precisa entregar a notificação no horário.`);
+    }
+  }
+
+  return (
+    <div className="grid gap-6">
+      {status && <p className="rounded-md bg-white/[0.04] p-3 text-sm text-slate-300">{status}</p>}
+      <section className="grid gap-6 lg:grid-cols-[1fr_360px]">
+        <Card className="p-5">
+          <h2 className="mb-4 text-lg font-semibold text-white">Amigos</h2>
+          {acceptedFriends.length ? (
+            <div className="grid gap-3 md:grid-cols-2">
+              {acceptedFriends.map((friend) => (
+                <div key={friend.id} className="rounded-md bg-white/[0.04] p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <button type="button" className="flex min-w-0 items-center gap-3 text-left" onClick={() => onViewProfile(friend.id)}>
+                      <div className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-md bg-white/5">
+                        {friend.avatar ? <img src={friend.avatar} alt={friend.name} className="h-full w-full object-cover" /> : <span className="text-sm font-semibold text-white">{userInitials(friend.name)}</span>}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-white">{friend.name}</p>
+                        <p className="text-xs text-slate-400">{friend.total_xp} XP</p>
+                      </div>
+                    </button>
+                    <Button type="button" variant="ghost" className="h-9 px-2" onClick={() => removeFriend(friend)}>Remover</Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <EmptyState title="Nenhuma amizade confirmada ainda." />
+          )}
+
+          <h3 className="mb-3 mt-6 text-base font-semibold text-white">Pedidos enviados</h3>
+          {pendingFriends.length ? (
+            <div className="space-y-3">
+              {pendingFriends.map((friend) => (
+                <div key={friend.id} className="flex items-center justify-between gap-3 rounded-md bg-white/[0.04] p-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-white">{friend.name}</p>
+                    <p className="text-xs text-slate-400">Aguardando confirmação</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button type="button" variant="secondary" className="h-9 px-3" onClick={() => acceptLocalFriend(friend)}>Marcar amigo</Button>
+                    <Button type="button" variant="ghost" className="h-9 px-3" onClick={() => removeFriend(friend)}>Cancelar</Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <EmptyState title="Nenhum pedido pendente." />
+          )}
+        </Card>
+
+        <Card className="p-5">
+          <h2 className="mb-4 text-lg font-semibold text-white">Enviar incentivo</h2>
+          <form className="grid gap-3" onSubmit={sendNudge}>
+            <Field label="Amigo">
+              <NativeSelect value={selectedFriendId} onChange={(event) => setSelectedFriendId(event.target.value)} required>
+                <option value="">Selecione</option>
+                {friends.map((friend) => <option key={friend.id} value={friend.id}>{friend.name}</option>)}
+              </NativeSelect>
+            </Field>
+            <Field label="Mensagem">
+              <NativeSelect value={message} onChange={(event) => setMessage(event.target.value)}>
+                <option value="Continue, você está indo muito bem!">Continue, você está indo muito bem!</option>
+                <option value="Mande ver, falta pouco!">Mande ver, falta pouco!</option>
+                <option value="Parabéns pelo progresso!">Parabéns pelo progresso!</option>
+              </NativeSelect>
+            </Field>
+            <Field label="Enviar em">
+              <NativeSelect value={delayMinutes} onChange={(event) => setDelayMinutes(event.target.value)}>
+                <option value="0">Agora</option>
+                <option value="30">30 minutos</option>
+                <option value="120">2 horas</option>
+                <option value="1440">Amanhã</option>
+              </NativeSelect>
+            </Field>
+            <Button type="submit" disabled={!selectedFriendId}>
+              <Send className="h-4 w-4" aria-hidden="true" />
+              Enviar incentivo
+            </Button>
+          </form>
+
+          <h3 className="mb-3 mt-6 text-base font-semibold text-white">Agendados</h3>
+          {nudges.length ? (
+            <div className="space-y-3">
+              {nudges.slice(0, 4).map((nudge) => (
+                <div key={nudge.id} className="rounded-md bg-white/[0.04] p-3">
+                  <p className="text-sm font-medium text-white">{nudge.to_name}</p>
+                  <p className="text-xs text-slate-400">{nudge.message}</p>
+                  <p className="mt-2 flex items-center gap-1 text-xs text-slate-500">
+                    <Clock3 className="h-3.5 w-3.5" aria-hidden="true" />
+                    {new Date(nudge.deliver_at).toLocaleString("pt-BR")}
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <EmptyState title="Nenhum incentivo agendado." />
+          )}
+        </Card>
+      </section>
+
+      <Card className="p-5">
+        <h2 className="mb-4 text-lg font-semibold text-white">Encontrar pessoas</h2>
+        {discoverable.length ? (
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {discoverable.map((item) => (
+              <div key={item.user.id} className="rounded-md bg-white/[0.04] p-3">
+                <button type="button" className="flex w-full min-w-0 items-center gap-3 text-left" onClick={() => onViewProfile(item.user.id)}>
+                  <div className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-md bg-white/5">
+                    {item.user.avatar ? <img src={item.user.avatar} alt={item.user.name} className="h-full w-full object-cover" /> : <span className="text-sm font-semibold text-white">{userInitials(item.user.name)}</span>}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-white">{item.user.name}</p>
+                    <p className="text-xs text-slate-400">{item.total_xp} XP</p>
+                  </div>
+                </button>
+                <Button type="button" variant="secondary" className="mt-3 w-full" onClick={() => sendFriendRequest(item.user)}>
+                  <UserRoundPlus className="h-4 w-4" aria-hidden="true" />
+                  Adicionar amizade
+                </Button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <EmptyState title="Nenhuma nova pessoa encontrada no ranking." />
+        )}
       </Card>
     </div>
   );
@@ -2827,6 +3183,7 @@ export function App() {
           {page === "achievements" && <AchievementsPage data={data} user={session.user} />}
           {page === "profile" && <ProfilePage data={data} refresh={loadData} user={session.user} onUserChange={(updated) => setSession((current) => (current ? { ...current, user: updated } : current))} onDeleteAccount={logout} />}
           {page === "social" && <SocialPage ranking={data.ranking} user={session.user} onViewProfile={setSelectedProfileId} />}
+          {page === "friends" && <FriendsPage ranking={data.ranking} user={session.user} onViewProfile={setSelectedProfileId} />}
           <footer className="mt-10 border-t border-white/10 py-5 text-center text-xs text-slate-500">
             Todos os direitos reservados a{" "}
             <a
@@ -2845,6 +3202,7 @@ export function App() {
         profileId={selectedProfileId}
         currentUser={session.user}
         localBadges={data.badges}
+        currentGroup={data.couple}
         onClose={() => setSelectedProfileId(null)}
       />
     </div>

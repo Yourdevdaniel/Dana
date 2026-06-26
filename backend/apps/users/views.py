@@ -6,7 +6,12 @@ from rest_framework.views import APIView
 from core.responses import error_response, success_response
 
 from .models import User
-from .serializers import PublicProfileSerializer, UserSerializer, UserUpdateSerializer
+from .serializers import (
+    PrivacySerializer,
+    PublicProfileSerializer,
+    UserSerializer,
+    UserUpdateSerializer,
+)
 from .services import UserService
 
 
@@ -27,7 +32,7 @@ class ProfileDetailView(APIView):
 
     def get(self, request, pk):
         try:
-            user = User.objects.get(pk=pk, is_active=True)
+            user = User.objects.select_related("couple_group").get(pk=pk, is_active=True)
         except User.DoesNotExist:
             return error_response(message="Perfil não encontrado.", status=404)
         serializer = PublicProfileSerializer(user, context={"request": request})
@@ -68,3 +73,16 @@ class MeView(generics.RetrieveUpdateAPIView):
         user.is_active = False
         user.save(update_fields=["is_active"])
         return success_response(message="Conta desativada com sucesso.")
+
+
+class PrivacyView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        return success_response(data=PrivacySerializer(request.user).data)
+
+    def patch(self, request):
+        serializer = PrivacySerializer(request.user, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return success_response(data=serializer.data, message="Privacidade atualizada.")

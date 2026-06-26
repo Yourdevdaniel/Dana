@@ -33,6 +33,8 @@ class User(AbstractBaseUser, PermissionsMixin):
         related_name="members",
     )
     total_xp = models.PositiveIntegerField(default=0)
+    show_group_on_profile = models.BooleanField(default=True)
+    show_membership_on_other_profiles = models.BooleanField(default=True)
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)

@@ -80,7 +80,11 @@ class TestProfileDetailView:
     def test_public_fields_present(self, auth_client, other_user):
         r = auth_client.get(self._url(other_user.id))
         data = r.data["data"]
-        for field in ("id", "name", "avatar", "total_xp", "created_at", "featured_badges"):
+        for field in (
+            "id", "name", "avatar", "total_xp", "created_at",
+            "featured_badges", "show_group_on_profile",
+            "show_membership_on_other_profiles", "public_group",
+        ):
             assert field in data
 
     def test_featured_badges_is_list(self, auth_client, other_user):

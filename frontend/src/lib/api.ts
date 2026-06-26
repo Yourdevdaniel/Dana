@@ -170,6 +170,13 @@ export type PublicProfile = {
   total_xp: number;
   created_at: string;
   featured_badges?: BadgeAward[];
+  public_group?: {
+    id: string;
+    name: string;
+    avatar?: string | null;
+  } | null;
+  show_group_on_profile?: boolean;
+  show_membership_on_other_profiles?: boolean;
 };
 
 export type ProfileUpdatePayload = {

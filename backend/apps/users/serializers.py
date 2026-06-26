@@ -50,14 +50,35 @@ def _validate_base64_avatar(value):
 
 class PublicProfileSerializer(serializers.ModelSerializer):
     featured_badges = serializers.SerializerMethodField()
+    public_group = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ["id", "name", "avatar", "total_xp", "created_at", "featured_badges"]
+        fields = [
+            "id", "name", "avatar", "total_xp", "created_at",
+            "featured_badges",
+            "show_group_on_profile", "show_membership_on_other_profiles",
+            "public_group",
+        ]
         read_only_fields = fields
 
     def get_featured_badges(self, obj):
         return []
+
+    def get_public_group(self, obj):
+        if not obj.show_group_on_profile or not obj.couple_group:
+            return None
+        return {
+            "id": str(obj.couple_group.id),
+            "name": obj.couple_group.name,
+            "avatar": obj.couple_group.avatar,
+        }
+
+
+class PrivacySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ["show_group_on_profile", "show_membership_on_other_profiles"]
 
 
 class UserSerializer(serializers.ModelSerializer):
