@@ -16,10 +16,11 @@ ALLOWED_HOSTS = [
 MIDDLEWARE.insert(2, "whitenoise.middleware.WhiteNoiseMiddleware")  # noqa: F405
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
-# PostgreSQL via DATABASE_URL (Render fornece automaticamente)
-_db_url = os.getenv("DATABASE_URL")
+# PostgreSQL: DATABASE_URL já é lido em base.py via os.environ.
+# Aqui apenas aplica ssl_require=False para URLs internas do Render.
+_db_url = os.environ.get("DATABASE_URL")
 if _db_url:
-    DATABASES = {"default": dj_database_url.parse(_db_url, conn_max_age=600, ssl_require=True)}  # noqa: F405
+    DATABASES = {"default": dj_database_url.parse(_db_url, conn_max_age=600, ssl_require=False)}  # noqa: F405
 
 # CORS — usa env var se definida; fallback garante o domínio do Vercel
 _cors_raw = os.getenv("CORS_ALLOWED_ORIGINS", "https://dana-two-alpha.vercel.app")

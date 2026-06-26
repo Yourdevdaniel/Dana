@@ -1,3 +1,4 @@
+import os
 from datetime import timedelta
 from pathlib import Path
 
@@ -68,16 +69,21 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "config.wsgi.application"
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": config("DB_NAME", default="finance_couple"),
-        "USER": config("DB_USER", default="finance"),
-        "PASSWORD": config("DB_PASSWORD", default="finance"),
-        "HOST": config("DB_HOST", default="db"),
-        "PORT": config("DB_PORT", default="5432"),
+_DATABASE_URL = os.environ.get("DATABASE_URL")
+if _DATABASE_URL:
+    import dj_database_url as _dj
+    DATABASES = {"default": _dj.parse(_DATABASE_URL, conn_max_age=600)}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": config("DB_NAME", default="finance_couple"),
+            "USER": config("DB_USER", default="finance"),
+            "PASSWORD": config("DB_PASSWORD", default="finance"),
+            "HOST": config("DB_HOST", default="db"),
+            "PORT": config("DB_PORT", default="5432"),
+        }
     }
-}
 
 AUTH_USER_MODEL = "users.User"
 
