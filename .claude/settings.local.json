@@ -48,7 +48,9 @@
       "PowerShell(py *)",
       "PowerShell(docker --version 2>&1; docker ps 2>&1 | Select-Object -First 3)",
       "PowerShell(Start-Process \"C:\\\\Program Files\\\\Docker\\\\Docker\\\\Docker Desktop.exe\" -ErrorAction SilentlyContinue; Start-Sleep -Seconds 5; docker ps 2>&1 | Select-Object -First 2)",
-      "Bash(git commit *)"
+      "Bash(git commit *)",
+      "Bash(npm.cmd run *)",
+      "Bash(npm.cmd test *)"
     ]
   }
 }

@@ -11,6 +11,7 @@ import {
   CircleDollarSign,
   CreditCard,
   HandCoins,
+  HelpCircle,
   Landmark,
   LayoutDashboard,
   Link2,
@@ -167,6 +168,76 @@ const navigation = [
   { id: "social", label: "Rede", icon: UserRoundSearch },
 ] satisfies Array<{ id: Page; label: string; icon: typeof LayoutDashboard }>;
 
+const navigationSections = [
+  { id: "overview", label: "Visão geral", pages: ["dashboard", "wallet"] },
+  { id: "money", label: "Movimentações", pages: ["transactions", "categories", "fixed"] },
+  { id: "plans", label: "Planos", pages: ["goals", "investments", "debts"] },
+  { id: "people", label: "Social", pages: ["couple", "achievements", "profile", "social"] },
+] satisfies Array<{ id: string; label: string; pages: Page[] }>;
+
+const pageHelp: Record<Page, { title: string; body: string; terms: string[] }> = {
+  dashboard: {
+    title: "Dashboard",
+    body: "Mostra um resumo da sua vida financeira: saldo, patrimônio, gastos, reserva recomendada, metas, dívidas e movimentações recentes.",
+    terms: ["Saldo: dinheiro disponível agora.", "Patrimônio: o que você tem menos o que deve.", "Reserva ideal: valor sugerido para emergências."],
+  },
+  wallet: {
+    title: "Carteira",
+    body: "Centraliza seu dinheiro. Registre salário ou ajuste o saldo real quando a carteira estiver diferente do valor mostrado.",
+    terms: ["Salário: renda recorrente registrada no histórico.", "Ajuste de saldo: correção criada como entrada ou saída para bater com o valor real."],
+  },
+  transactions: {
+    title: "Transações",
+    body: "Registre entradas e saídas do dia a dia. Essas movimentações alimentam saldo, gráficos e dashboard.",
+    terms: ["Receita: dinheiro que entra.", "Despesa: dinheiro que sai.", "Recorrente: algo que costuma se repetir."],
+  },
+  categories: {
+    title: "Categorias",
+    body: "Organize transações por assunto, como mercado, transporte, salário ou lazer.",
+    terms: ["Sistema: categoria padrão do app.", "Personalizada: categoria criada por você."],
+  },
+  goals: {
+    title: "Metas",
+    body: "Acompanhe objetivos financeiros e registre depósitos para ver o progresso até o valor alvo.",
+    terms: ["Valor alvo: quanto você quer juntar.", "Valor atual: quanto já foi separado."],
+  },
+  investments: {
+    title: "Investimentos",
+    body: "Cadastre onde seu dinheiro está investido e acompanhe total investido, valor atual, resultado e divisão por classe.",
+    terms: ["Valor investido: quanto você colocou.", "Valor atual: quanto vale hoje.", "Aporte mensal: quanto pretende adicionar por mês."],
+  },
+  debts: {
+    title: "Dívidas",
+    body: "Registre valores que precisa pagar, acompanhe o restante e marque como paga quando quitar.",
+    terms: ["Valor pago: quanto já foi abatido.", "Restante: quanto ainda falta pagar."],
+  },
+  fixed: {
+    title: "Contas fixas",
+    body: "Cadastre despesas que voltam todo mês, como aluguel, internet ou assinatura, e marque quando forem pagas.",
+    terms: ["Dia de vencimento: dia do mês em que a conta vence.", "Pago: conta já resolvida no mês."],
+  },
+  couple: {
+    title: "Casal",
+    body: "Crie ou entre em um grupo para acompanhar informações financeiras junto com outra pessoa.",
+    terms: ["Código de convite: código para outra pessoa entrar no grupo.", "Integrantes: pessoas vinculadas ao casal ou grupo."],
+  },
+  achievements: {
+    title: "Conquistas",
+    body: "Mostra objetivos desbloqueados pelo uso do app e badges recebidas pelo seu progresso.",
+    terms: ["Conquistadas: já completas.", "Em andamento: ainda faltam passos.", "Badges: recompensas visuais do perfil."],
+  },
+  profile: {
+    title: "Perfil",
+    body: "Edite seus dados, foto, destaques do perfil e configurações da conta.",
+    terms: ["Destaques: badges ou conquistas exibidas no perfil.", "XP: pontos ganhos por progresso no app."],
+  },
+  social: {
+    title: "Ranking global",
+    body: "Mostra os usuários com mais XP total e sua posição quando você aparece no top 10.",
+    terms: ["XP total: soma dos pontos ganhos.", "Ranking: lista ordenada do maior XP para o menor."],
+  },
+};
+
 const monthFormatter = new Intl.DateTimeFormat("pt-BR", { month: "short" });
 
 function toNumber(value: string | number | null | undefined) {
@@ -298,6 +369,45 @@ function NativeSelect(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
         props.className,
       )}
     />
+  );
+}
+
+function PageHelp({ page }: { page: Page }) {
+  const [open, setOpen] = useState(false);
+  const help = pageHelp[page];
+
+  return (
+    <div className="relative">
+      <Button
+        type="button"
+        variant="ghost"
+        className="h-10 w-10 p-0"
+        aria-label="Ajuda da página"
+        onClick={() => setOpen((current) => !current)}
+      >
+        <HelpCircle className="h-5 w-5" aria-hidden="true" />
+      </Button>
+      {open && (
+        <div className="absolute right-0 top-12 z-30 w-[min(22rem,calc(100vw-2rem))] rounded-md border border-white/10 bg-surface p-4 text-left shadow-soft">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-semibold text-white">{help.title}</h2>
+              <p className="mt-2 text-sm leading-5 text-slate-300">{help.body}</p>
+            </div>
+            <Button type="button" variant="ghost" className="h-8 px-2" onClick={() => setOpen(false)}>
+              Fechar
+            </Button>
+          </div>
+          <div className="mt-3 grid gap-2">
+            {help.terms.map((term) => (
+              <p key={term} className="rounded-md bg-white/[0.04] px-3 py-2 text-xs leading-5 text-slate-400">
+                {term}
+              </p>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -801,6 +911,7 @@ type FormProps = {
 };
 
 function WalletPage({ data, refresh }: FormProps) {
+  const [walletEntryMode, setWalletEntryMode] = useState<"salary" | "balance">("salary");
   const [salary, setSalary] = useState("");
   const [targetBalance, setTargetBalance] = useState("");
   const [date, setDate] = useState(today());
@@ -880,27 +991,37 @@ function WalletPage({ data, refresh }: FormProps) {
         </div>
       </Card>
       <Card className="p-5">
-        <h2 className="mb-4 text-lg font-semibold text-white">Definir saldo atual</h2>
-        <form className="grid gap-3" onSubmit={adjustBalance}>
-          <Field label="Saldo real da carteira">
-            <MoneyInput value={targetBalance} onValueChange={setTargetBalance} required />
-          </Field>
-          <p className="text-xs text-slate-400">
-            O sistema cria uma transação de ajuste para o saldo bater com o valor informado.
-          </p>
-          {error && <p className="text-sm text-pink-200">{error}</p>}
-          <Button type="submit">Ajustar saldo</Button>
-        </form>
-      </Card>
-      <Card className="p-5">
-        <h2 className="mb-4 text-lg font-semibold text-white">Registrar salário</h2>
-        <form className="grid gap-3" onSubmit={submitSalary}>
-          <Field label="Valor"><MoneyInput value={salary} onValueChange={setSalary} required /></Field>
-          <Field label="Data efetiva"><Input value={date} onChange={(event) => setDate(event.target.value)} type="date" required /></Field>
-          <Field label="Observação"><Input value={note} onChange={(event) => setNote(event.target.value)} /></Field>
-          {error && <p className="text-sm text-pink-200">{error}</p>}
-          <Button type="submit">Salvar salário</Button>
-        </form>
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold text-white">Entrada da carteira</h2>
+        </div>
+        <div className="mb-4 grid grid-cols-2 gap-2 rounded-md border border-white/10 bg-white/[0.04] p-1">
+          <Button type="button" variant={walletEntryMode === "salary" ? "primary" : "ghost"} className="h-9 px-3" onClick={() => setWalletEntryMode("salary")}>
+            Salário
+          </Button>
+          <Button type="button" variant={walletEntryMode === "balance" ? "primary" : "ghost"} className="h-9 px-3" onClick={() => setWalletEntryMode("balance")}>
+            Ajustar saldo
+          </Button>
+        </div>
+        {walletEntryMode === "salary" ? (
+          <form className="grid gap-3" onSubmit={submitSalary}>
+            <Field label="Valor"><MoneyInput value={salary} onValueChange={setSalary} required /></Field>
+            <Field label="Data efetiva"><Input value={date} onChange={(event) => setDate(event.target.value)} type="date" required /></Field>
+            <Field label="Observação"><Input value={note} onChange={(event) => setNote(event.target.value)} /></Field>
+            {error && <p className="text-sm text-pink-200">{error}</p>}
+            <Button type="submit">Salvar salário</Button>
+          </form>
+        ) : (
+          <form className="grid gap-3" onSubmit={adjustBalance}>
+            <Field label="Saldo real da carteira">
+              <MoneyInput value={targetBalance} onValueChange={setTargetBalance} required />
+            </Field>
+            <p className="text-xs text-slate-400">
+              Cria uma transação de ajuste para o saldo bater com o valor informado.
+            </p>
+            {error && <p className="text-sm text-pink-200">{error}</p>}
+            <Button type="submit">Ajustar saldo</Button>
+          </form>
+        )}
       </Card>
     </div>
   );
@@ -2271,6 +2392,12 @@ export function App() {
   const [authState, setAuthState] = useState<"checking" | "authenticated" | "anonymous">(() => (readSession() ? "checking" : "anonymous"));
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [openNavSections, setOpenNavSections] = useState<Record<string, boolean>>({
+    overview: true,
+    money: true,
+    plans: true,
+    people: true,
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -2414,6 +2541,7 @@ export function App() {
   }
 
   const displayName = coupleDisplayName(session.user, data.couple);
+  const navigationById = new Map(navigation.map((item) => [item.id, item]));
 
   function logout() {
     clearSession();
@@ -2422,18 +2550,22 @@ export function App() {
     setMobileMenuOpen(false);
   }
 
+  function toggleNavSection(sectionId: string) {
+    setOpenNavSections((current) => ({ ...current, [sectionId]: !current[sectionId] }));
+  }
+
   return (
     <div className="min-h-screen bg-background text-slate-100">
       {mobileMenuOpen && <button type="button" aria-label="Fechar menu" className="fixed inset-0 z-20 bg-black/50 lg:hidden" onClick={() => setMobileMenuOpen(false)} />}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-30 w-72 border-r border-white/10 bg-surface/95 p-5 transition-all duration-200 lg:translate-x-0",
-          sidebarCollapsed ? "lg:w-20" : "lg:w-64",
+          "fixed inset-y-0 left-0 z-30 w-72 overflow-y-auto border-r border-white/10 bg-surface/95 p-4 transition-all duration-200 lg:translate-x-0",
+          sidebarCollapsed ? "lg:w-16" : "lg:w-56",
           mobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
         )}
       >
         <div className={cn("flex items-center gap-3", sidebarCollapsed && "lg:justify-center")}>
-          <div className="grid h-10 w-10 place-items-center rounded-md bg-primary">
+          <div className="grid h-9 w-9 place-items-center rounded-md bg-primary">
             <WalletIcon className="h-5 w-5" aria-hidden="true" />
           </div>
           <div className={cn("min-w-0", sidebarCollapsed && "lg:hidden")}>
@@ -2450,6 +2582,19 @@ export function App() {
             <ChevronLeft className="h-4 w-4" aria-hidden="true" />
           </Button>
         </div>
+        {data.couple?.members?.length ? (
+          <div className={cn("mt-4 flex items-center gap-2", sidebarCollapsed && "lg:flex-col")}>
+            {data.couple.members.slice(0, 4).map((member) => (
+              <div key={member.id} className="grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-md bg-white/5" title={member.name}>
+                {member.avatar ? (
+                  <img src={member.avatar} alt={member.name} className="h-full w-full object-cover" />
+                ) : (
+                  <span className="text-xs font-semibold text-white">{userInitials(member.name)}</span>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : null}
         {sidebarCollapsed && (
           <Button
             type="button"
@@ -2461,51 +2606,55 @@ export function App() {
             <ChevronRight className="h-4 w-4" aria-hidden="true" />
           </Button>
         )}
-        <nav className="mt-8 space-y-1" aria-label="Principal">
-          {navigation.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              className={cn(
-                "focus-ring flex h-11 w-full items-center gap-3 rounded-md px-3 text-left text-sm transition",
-                sidebarCollapsed && "lg:justify-center lg:px-0",
-                page === item.id ? "bg-white/10 text-white" : "text-slate-400 hover:bg-white/5 hover:text-white",
-              )}
-              onClick={() => {
-                setPage(item.id);
-                setMobileMenuOpen(false);
-              }}
-            >
-              <item.icon className="h-4 w-4" aria-hidden="true" />
-              <span className={cn(sidebarCollapsed && "lg:hidden")}>{item.label}</span>
-            </button>
-          ))}
+        <nav className="mt-6 space-y-3" aria-label="Principal">
+          {navigationSections.map((section) => {
+            const isOpen = openNavSections[section.id] ?? true;
+            return (
+              <div key={section.id} className="space-y-1">
+                <button
+                  type="button"
+                  className={cn(
+                    "focus-ring flex h-8 w-full items-center justify-between rounded-md px-2 text-xs font-medium uppercase tracking-wide text-slate-500 transition hover:bg-white/5 hover:text-slate-300",
+                    sidebarCollapsed && "lg:justify-center lg:px-0",
+                  )}
+                  onClick={() => toggleNavSection(section.id)}
+                >
+                  <span className={cn(sidebarCollapsed && "lg:hidden")}>{section.label}</span>
+                  <ChevronRight className={cn("h-3.5 w-3.5 transition", isOpen && "rotate-90", sidebarCollapsed && "lg:hidden")} aria-hidden="true" />
+                </button>
+                {(isOpen || sidebarCollapsed) && (
+                  <div className="space-y-1">
+                    {section.pages.map((pageId) => {
+                      const item = navigationById.get(pageId);
+                      if (!item) return null;
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          className={cn(
+                            "focus-ring flex h-10 w-full items-center gap-3 rounded-md px-2 text-left text-sm transition",
+                            sidebarCollapsed && "lg:justify-center lg:px-0",
+                            page === item.id ? "bg-white/10 text-white" : "text-slate-400 hover:bg-white/5 hover:text-white",
+                          )}
+                          onClick={() => {
+                            setPage(item.id);
+                            setMobileMenuOpen(false);
+                          }}
+                        >
+                          <item.icon className="h-4 w-4" aria-hidden="true" />
+                          <span className={cn(sidebarCollapsed && "lg:hidden")}>{item.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </nav>
-        {data.couple?.members?.length ? (
-          <div className="mt-6 border-t border-white/10 pt-5">
-            <p className={cn("mb-3 text-xs font-medium uppercase tracking-wide text-slate-500", sidebarCollapsed && "lg:hidden")}>Integrantes</p>
-            <div className={cn("grid gap-2", sidebarCollapsed && "lg:justify-center")}>
-              {data.couple.members.map((member) => (
-                <div key={member.id} className={cn("flex min-w-0 items-center gap-3 rounded-md bg-white/[0.04] p-2", sidebarCollapsed && "lg:bg-transparent lg:p-0")}>
-                  <div className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-md bg-white/5">
-                    {member.avatar ? (
-                      <img src={member.avatar} alt={member.name} className="h-full w-full object-cover" />
-                    ) : (
-                      <span className="text-xs font-semibold text-white">{userInitials(member.name)}</span>
-                    )}
-                  </div>
-                  <div className={cn("min-w-0", sidebarCollapsed && "lg:hidden")}>
-                    <p className="truncate text-sm font-medium text-white">{member.name}</p>
-                    <p className="truncate text-xs text-slate-400">{member.total_xp} XP</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : null}
       </aside>
 
-      <main className={cn("transition-all duration-200", sidebarCollapsed ? "lg:pl-20" : "lg:pl-64")}>
+      <main className={cn("transition-all duration-200", sidebarCollapsed ? "lg:pl-16" : "lg:pl-56")}>
         <header className="sticky top-0 z-10 border-b border-white/10 bg-background/90 px-4 py-4 backdrop-blur md:px-6 lg:px-8">
           <div className="flex items-center justify-between gap-4">
             <div className="flex min-w-0 items-center gap-3">
@@ -2518,6 +2667,7 @@ export function App() {
               </div>
             </div>
             <div className="flex items-center gap-2">
+              <PageHelp page={page} />
               <Button type="button" variant="secondary" className="hidden md:inline-flex" onClick={() => setPage("couple")}>
                 <Link2 className="h-4 w-4" aria-hidden="true" />
                 Vincular parceiro
