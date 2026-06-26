@@ -381,12 +381,13 @@ function PageHelp({ page }: { page: Page }) {
     <div className="relative">
       <Button
         type="button"
-        variant="ghost"
-        className="h-10 w-10 p-0"
+        variant="secondary"
+        className="h-10 border border-secondary/40 bg-secondary/15 px-3 text-secondary hover:bg-secondary/25 hover:text-white"
         aria-label="Ajuda da página"
         onClick={() => setOpen((current) => !current)}
       >
         <HelpCircle className="h-5 w-5" aria-hidden="true" />
+        <span className="hidden sm:inline">Está com dúvida?</span>
       </Button>
       {open && (
         <div className="absolute right-0 top-12 z-30 w-[min(22rem,calc(100vw-2rem))] rounded-md border border-white/10 bg-surface p-4 text-left shadow-soft">
