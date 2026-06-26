@@ -94,3 +94,24 @@ class TestProfileDetailView:
         other_user.save()
         r = auth_client.get(self._url(other_user.id))
         assert r.status_code == 404
+
+
+@pytest.mark.django_db
+class TestDeleteMe:
+    url = "/api/users/me/"
+
+    def test_delete_deactivates_account(self, auth_client, user):
+        r = auth_client.delete(self.url)
+        assert r.status_code == 200
+        assert r.data["success"] is True
+        user.refresh_from_db()
+        assert user.is_active is False
+
+    def test_deleted_user_cannot_login(self, auth_client, user, api_client):
+        auth_client.delete(self.url)
+        r = api_client.post("/api/auth/login/", {"email": "user@test.com", "password": "pass1234"})
+        assert r.status_code in (400, 401)
+
+    def test_requires_auth(self, api_client):
+        r = api_client.delete(self.url)
+        assert r.status_code == 401

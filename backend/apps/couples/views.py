@@ -1,11 +1,15 @@
-from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
 from core.exceptions import BusinessException
 from core.responses import error_response, success_response
 
-from .serializers import CoupleGroupCreateSerializer, CoupleGroupSerializer, JoinCoupleSerializer
+from .serializers import (
+    CoupleGroupCreateSerializer,
+    CoupleGroupSerializer,
+    CoupleGroupUpdateSerializer,
+    JoinCoupleSerializer,
+)
 from .services import CoupleGroupService
 
 
@@ -31,6 +35,19 @@ class CoupleGroupView(APIView):
             )
         except BusinessException as e:
             return error_response(message=e.message, status=e.status_code)
+
+    def patch(self, request):
+        if not request.user.couple_group:
+            return error_response(message="Sem grupo de casal.", status=400)
+        serializer = CoupleGroupUpdateSerializer(
+            request.user.couple_group, data=request.data, partial=True
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return success_response(
+            data=CoupleGroupSerializer(serializer.instance).data,
+            message="Grupo atualizado.",
+        )
 
     def delete(self, request):
         try:

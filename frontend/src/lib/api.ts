@@ -36,6 +36,7 @@ export type Session = AuthPayload;
 export type CoupleGroup = {
   id: string;
   name: string;
+  avatar?: string | null;
   invite_code: string;
   members: User[];
   created_at: string;

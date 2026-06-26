@@ -28,6 +28,27 @@ class TestCoupleGroupView:
         assert r.data["data"]["name"] == "Nosso"
         assert "invite_code" in r.data["data"]
 
+    def test_get_group_includes_avatar_field(self, auth_client, user):
+        auth_client.post(self.url, {"name": "Casal"})
+        r = auth_client.get(self.url)
+        assert "avatar" in r.data["data"]
+
+    def test_patch_group_name(self, auth_client, user):
+        auth_client.post(self.url, {"name": "Antigo"})
+        r = auth_client.patch(self.url, {"name": "Novo Nome"})
+        assert r.status_code == 200
+        assert r.data["data"]["name"] == "Novo Nome"
+
+    def test_patch_group_avatar(self, auth_client, user):
+        auth_client.post(self.url, {"name": "Casal"})
+        r = auth_client.patch(self.url, {"avatar": "data:image/png;base64,abc123"})
+        assert r.status_code == 200
+        assert r.data["data"]["avatar"] == "data:image/png;base64,abc123"
+
+    def test_patch_without_group_returns_400(self, auth_client):
+        r = auth_client.patch(self.url, {"name": "X"})
+        assert r.status_code == 400
+
     def test_leave_group(self, auth_client, user):
         auth_client.post(self.url, {"name": "Casal"})
         r = auth_client.delete(self.url)

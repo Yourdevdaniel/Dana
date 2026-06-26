@@ -126,8 +126,8 @@ const rules: AchievementRule[] = [
   },
   {
     id: "primeiro-salario",
-    title: "Primeiro Salario",
-    description: "Registrou o primeiro salario.",
+    title: "Primeiro Salário",
+    description: "Registrou o primeiro salário.",
     category: "Fluxo",
     icon: BriefcaseBusiness,
     tier: "bronze",
@@ -137,7 +137,7 @@ const rules: AchievementRule[] = [
   {
     id: "salarios-3",
     title: "Ritmo de Renda",
-    description: "Registrou 3 salarios.",
+    description: "Registrou 3 salários.",
     category: "Fluxo",
     icon: Coins,
     tier: "silver",
@@ -156,7 +156,7 @@ const rules: AchievementRule[] = [
   },
   {
     id: "categorias-personalizadas-3",
-    title: "Organizacao Propria",
+    title: "Organização Própria",
     description: "Criou 3 categorias personalizadas.",
     category: "Fluxo",
     icon: BadgeCheck,
@@ -166,8 +166,8 @@ const rules: AchievementRule[] = [
   },
   {
     id: "primeira-transacao",
-    title: "Primeira Transacao",
-    description: "Registrou a primeira movimentacao.",
+    title: "Primeira Transação",
+    description: "Registrou a primeira movimentação.",
     category: "Fluxo",
     icon: CreditCard,
     tier: "bronze",
@@ -177,7 +177,7 @@ const rules: AchievementRule[] = [
   {
     id: "10-transacoes",
     title: "Movimento Constante",
-    description: "Registrou 10 transacoes.",
+    description: "Registrou 10 transações.",
     category: "Fluxo",
     icon: CreditCard,
     tier: "silver",
@@ -197,7 +197,7 @@ const rules: AchievementRule[] = [
   {
     id: "meta-50",
     title: "Metade do Caminho",
-    description: "Alcancou 50% em qualquer meta.",
+    description: "Alcançou 50% em qualquer meta.",
     category: "Metas",
     icon: Target,
     tier: "silver",
@@ -206,7 +206,7 @@ const rules: AchievementRule[] = [
   },
   {
     id: "meta-concluida",
-    title: "Meta Concluida",
+    title: "Meta Concluída",
     description: "Concluiu a primeira meta.",
     category: "Metas",
     icon: Gem,
@@ -227,8 +227,8 @@ const rules: AchievementRule[] = [
   {
     id: "primeira-divida",
     title: "Frente a Frente",
-    description: "Registrou a primeira divida.",
-    category: "Dividas",
+    description: "Registrou a primeira dívida.",
+    category: "Dívidas",
     icon: HeartHandshake,
     tier: "bronze",
     getProgress: (stats) => Math.min(100, stats.debts.length * 100),
@@ -236,9 +236,9 @@ const rules: AchievementRule[] = [
   },
   {
     id: "divida-quitada",
-    title: "Divida Zerada",
-    description: "Quitou a primeira divida.",
-    category: "Dividas",
+    title: "Dívida Zerada",
+    description: "Quitou a primeira dívida.",
+    category: "Dívidas",
     icon: ShieldCheck,
     tier: "silver",
     getProgress: (stats) => Math.min(100, paidDebts(stats) * 100),
@@ -266,7 +266,7 @@ const rules: AchievementRule[] = [
   },
   {
     id: "contas-pagas",
-    title: "Mes em Ordem",
+    title: "Mês em Ordem",
     description: "Marcou pelo menos uma conta fixa como paga.",
     category: "Contas fixas",
     icon: ShieldCheck,
@@ -298,7 +298,7 @@ const rules: AchievementRule[] = [
     id: "saldo-positivo",
     title: "Saldo Positivo",
     description: "Manteve o saldo acima de zero.",
-    category: "Patrimonio",
+    category: "Patrimônio",
     icon: CircleDollarSign,
     tier: "bronze",
     getProgress: (stats) => (stats.dashboard && Number(stats.dashboard.balance) > 0 ? 100 : 0),
@@ -308,7 +308,7 @@ const rules: AchievementRule[] = [
     id: "reserva-ideal",
     title: "Reserva Ideal",
     description: "Atingiu a reserva recomendada.",
-    category: "Patrimonio",
+    category: "Patrimônio",
     icon: PiggyBank,
     tier: "gold",
     getProgress: (stats) => {
@@ -324,9 +324,9 @@ const rules: AchievementRule[] = [
   },
   {
     id: "patrimonio-saudavel",
-    title: "Patrimonio Saudavel",
-    description: "Teve patrimonio liquido positivo.",
-    category: "Patrimonio",
+    title: "Patrimônio Saudável",
+    description: "Teve patrimônio líquido positivo.",
+    category: "Patrimônio",
     icon: ShieldCheck,
     tier: "silver",
     getProgress: (stats) => (stats.dashboard && Number(stats.dashboard.net_worth) > 0 ? 100 : 0),
@@ -335,7 +335,7 @@ const rules: AchievementRule[] = [
   {
     id: "100-xp",
     title: "XP Inicial",
-    description: "Alcancou 100 XP.",
+    description: "Alcançou 100 XP.",
     category: "XP",
     icon: Medal,
     tier: "bronze",
@@ -345,7 +345,7 @@ const rules: AchievementRule[] = [
   {
     id: "500-xp",
     title: "Economista",
-    description: "Alcancou 500 XP.",
+    description: "Alcançou 500 XP.",
     category: "XP",
     icon: Medal,
     tier: "silver",
@@ -355,7 +355,7 @@ const rules: AchievementRule[] = [
   {
     id: "1000-xp",
     title: "Casal Exemplar",
-    description: "Alcancou 1000 XP.",
+    description: "Alcançou 1000 XP.",
     category: "XP",
     icon: Trophy,
     tier: "gold",
@@ -385,7 +385,7 @@ const rules: AchievementRule[] = [
   {
     id: "perfil-atualizado",
     title: "Perfil Atualizado",
-    description: "Atualizou as informacoes de perfil.",
+    description: "Atualizou as informações de perfil.",
     category: "Perfil",
     icon: Sparkles,
     tier: "silver",
@@ -404,7 +404,7 @@ const rules: AchievementRule[] = [
   },
   {
     id: "dashboard-ativo",
-    title: "Visao Geral",
+    title: "Visão Geral",
     description: "Acompanhou o painel financeiro.",
     category: "Dashboard",
     icon: BarChart3,

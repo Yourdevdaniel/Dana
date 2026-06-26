@@ -10,7 +10,7 @@ class CoupleGroupSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CoupleGroup
-        fields = ["id", "name", "invite_code", "members", "created_at"]
+        fields = ["id", "name", "avatar", "invite_code", "members", "created_at"]
         read_only_fields = ["id", "invite_code", "created_at"]
 
 
@@ -18,6 +18,12 @@ class CoupleGroupCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = CoupleGroup
         fields = ["name"]
+
+
+class CoupleGroupUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CoupleGroup
+        fields = ["name", "avatar"]
 
 
 class JoinCoupleSerializer(serializers.Serializer):

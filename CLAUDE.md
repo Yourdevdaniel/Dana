@@ -116,3 +116,125 @@ Base: `/api/investments/`
 
 - `npm.cmd run build` passou no frontend.
 - O build gerou apenas o aviso existente de chunk grande do Vite.
+
+## Rodada de frontend - controles financeiros e sociais
+
+### O que o Codex fez no frontend
+
+- Carteira:
+  - Adicionou o bloco `Definir saldo atual`.
+  - O front calcula a diferenca entre o saldo atual da carteira e o saldo informado.
+  - Se a diferenca for positiva, cria uma transacao `income` com descricao `Ajuste de saldo`.
+  - Se a diferenca for negativa, cria uma transacao `expense` com descricao `Ajuste de saldo`.
+  - Isso evita saldo manual fora do motor financeiro e usa o calculo existente da carteira.
+
+- Exclusoes:
+  - Transacoes agora tem botao de apagar chamando `DELETE /api/transactions/{id}/`.
+  - Categorias personalizadas agora tem botao de apagar chamando `DELETE /api/categories/{id}/`.
+  - Categorias de sistema nao mostram botao de apagar.
+  - Metas agora tem botao de apagar chamando `DELETE /api/goals/{id}/`.
+  - Dividas agora tem botao de apagar chamando `DELETE /api/debts/{id}/`.
+  - Contas fixas agora tem botao de apagar chamando `DELETE /api/fixed-expenses/{id}/`.
+  - Casal/grupo agora tem botao `Sair do casal`, chamando `DELETE /api/couples/`.
+
+- Dividas:
+  - Adicionado botao `Paga`.
+  - O front chama `PATCH /api/debts/{id}/` com `paid_amount` igual a `amount`.
+  - Visualmente considera completa quando `remaining <= 0` ou `status === "paid"`.
+
+- Casal/grupo:
+  - Adicionada UI para mudar nome do grupo.
+  - Adicionada UI para foto do casal/grupo.
+  - A foto e o nome ficam salvos localmente por enquanto:
+    - `finance-couple:couple-name:{couple_id}`
+    - `finance-couple:couple-avatar:{couple_id}`
+  - O front tambem tenta chamar `PATCH /api/couples/` com `{ name, avatar }`, para ficar pronto quando o backend aceitar.
+  - Integrantes do casal aparecem com foto/avatar na pagina Casal.
+  - Integrantes tambem aparecem na sidebar lateral.
+
+- Sidebar:
+  - Sidebar agora pode ser recolhida no desktop.
+  - Quando recolhida, mostra apenas icones e fotos dos integrantes.
+  - No mobile manteve o comportamento de menu aberto/fechado.
+
+- Perfil/conta:
+  - Adicionado bloco `Deletar conta`.
+  - O usuario precisa digitar `DELETAR`.
+  - O front chama `DELETE /api/users/me/` e limpa a sessao se o backend confirmar.
+
+- Badges/conquistas:
+  - A aba de badges do perfil agora permite destacar badges reais e tambem conquistas ganhas pelo motor local de conquistas.
+  - Conquistas destacadas ficam salvas no mesmo storage local do perfil com prefixo `achievement:`.
+
+- Rede:
+  - A pagina `Rede` deixou de ser busca de pessoas.
+  - Agora mostra `Ranking global`, usando `data.ranking` carregado de `/api/gamification/ranking/`.
+  - O ranking destaca o usuario atual quando ele aparece no top.
+
+### O que o Claude precisa fazer no backend
+
+- Dividas:
+  - Ajustar `DebtCreateSerializer` ou criar serializer de update para aceitar `status`.
+  - Quando `paid_amount >= amount`, o backend deve definir `status = "paid"` automaticamente.
+  - `remaining` nunca deve retornar valor negativo; usar zero quando pago acima do valor.
+  - Criar endpoint explicito opcional:
+    - `POST /api/debts/{id}/pay/`
+    - Deve marcar `paid_amount = amount`, `status = paid` e retornar a divida atualizada.
+
+- Carteira:
+  - Confirmar que o saldo da carteira considera apenas transacoes nao deletadas.
+  - Confirmar que transacao de tipo `income` soma e `expense` diminui.
+  - Opcional: criar endpoint `POST /api/wallet/adjust-balance/` que recebe `{ target_balance }`, calcula diferenca no backend e cria a transacao de ajuste com auditoria.
+
+- Exclusoes:
+  - Garantir que todos os endpoints usados pelo front existem e estao protegidos por usuario:
+    - `DELETE /api/transactions/{id}/`
+    - `DELETE /api/categories/{id}/`
+    - `DELETE /api/goals/{id}/`
+    - `DELETE /api/debts/{id}/`
+    - `DELETE /api/fixed-expenses/{id}/`
+    - `DELETE /api/couples/`
+  - Categorias de sistema nao devem poder ser apagadas por usuarios.
+  - Deletar transacao deve recalcular carteira/dashboard corretamente.
+
+- Casal/grupo:
+  - Adicionar campos ao modelo `CoupleGroup`:
+    - `avatar` ou `avatar_base64`, nullable.
+    - `updated_at`, se ainda nao existir via `BaseModel`.
+  - Implementar `PATCH /api/couples/`:
+    - aceita `name`;
+    - aceita `avatar`;
+    - apenas membro do casal pode editar;
+    - retorna `id`, `name`, `avatar`, `invite_code`, `members`, `created_at`.
+  - Atualizar serializer `CoupleGroupSerializer` para incluir `avatar`.
+
+- Conta:
+  - Implementar `DELETE /api/users/me/`.
+  - Comportamento esperado:
+    - soft delete preferencial: `is_active = False`;
+    - invalidar tokens se houver blacklist;
+    - preservar auditoria;
+    - impedir login posterior.
+  - Retornar envelope padrao de sucesso.
+
+- Ranking global:
+  - Confirmar que `/api/gamification/ranking/` ordena por `total_xp desc`.
+  - Confirmar que retorna top 10 global no formato:
+    - `rank`
+    - `user.id`
+    - `user.name`
+    - `user.avatar`
+    - `total_xp`
+  - Nao retornar email nem data de nascimento no ranking.
+
+- Badges/conquistas:
+  - Se quiser persistencia real dos destaques do perfil, criar endpoint para salvar destaques:
+    - `GET/PATCH /api/users/me/featured-badges/`
+    - aceitar ids de badges reais e ids de conquistas locais ou transformar conquistas em badges persistidas.
+
+### Validacao feita pelo Codex nesta rodada
+
+- `npm.cmd run lint` passou.
+- `npm.cmd run build` passou.
+- `npm.cmd test -- --run` passou.
+- O build continua emitindo apenas o aviso de chunk grande do Vite.

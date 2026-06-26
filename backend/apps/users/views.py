@@ -1,12 +1,12 @@
+from django.db.models import Q
 from rest_framework import generics
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
-from django.db.models import Q
 
-from core.responses import success_response
+from core.responses import error_response, success_response
 
 from .models import User
-from .serializers import UserSerializer, UserUpdateSerializer, PublicProfileSerializer
+from .serializers import PublicProfileSerializer, UserSerializer, UserUpdateSerializer
 from .services import UserService
 
 
@@ -29,7 +29,6 @@ class ProfileDetailView(APIView):
         try:
             user = User.objects.get(pk=pk, is_active=True)
         except User.DoesNotExist:
-            from core.responses import error_response
             return error_response(message="Perfil não encontrado.", status=404)
         serializer = PublicProfileSerializer(user, context={"request": request})
         return success_response(data=serializer.data)
@@ -57,3 +56,15 @@ class MeView(generics.RetrieveUpdateAPIView):
         svc = UserService()
         svc.update_profile(request.user, serializer.validated_data)
         return success_response(data=UserSerializer(request.user).data, message="Perfil atualizado.")
+
+    def delete(self, request, *args, **kwargs):
+        user = request.user
+        try:
+            from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
+            for token in OutstandingToken.objects.filter(user=user):
+                BlacklistedToken.objects.get_or_create(token=token)
+        except Exception:
+            pass
+        user.is_active = False
+        user.save(update_fields=["is_active"])
+        return success_response(message="Conta desativada com sucesso.")

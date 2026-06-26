@@ -24,3 +24,21 @@ class DebtCreateSerializer(serializers.ModelSerializer):
         if value <= 0:
             raise serializers.ValidationError("Valor deve ser positivo.")
         return value
+
+
+class DebtUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Debt
+        fields = ["creditor", "amount", "paid_amount", "due_date", "description", "status"]
+
+    def validate_amount(self, value):
+        if value <= 0:
+            raise serializers.ValidationError("Valor deve ser positivo.")
+        return value
+
+    def validate(self, attrs):
+        paid = attrs.get("paid_amount", self.instance.paid_amount if self.instance else 0)
+        amount = attrs.get("amount", self.instance.amount if self.instance else 0)
+        if paid >= amount:
+            attrs["status"] = Debt.StatusChoices.PAID
+        return attrs

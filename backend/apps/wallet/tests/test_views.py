@@ -33,6 +33,14 @@ class TestWalletView:
         r = auth_client.get(self.url)
         assert Decimal(str(r.data["data"]["balance"])) == Decimal("300")
 
+    def test_balance_excludes_soft_deleted_transactions(self, auth_client, user):
+        wallet = Wallet.objects.create(user=user)
+        from apps.transactions.models import Transaction
+        tx = Transaction.objects.create(user=user, wallet=wallet, amount=Decimal("1000"), type="income", date="2026-01-01")
+        tx.soft_delete()
+        r = auth_client.get(self.url)
+        assert Decimal(str(r.data["data"]["balance"])) == Decimal("0")
+
 
 @pytest.mark.django_db
 class TestSalaryView:
@@ -55,3 +63,39 @@ class TestSalaryView:
         Salary.objects.create(user=other, amount=Decimal("9999"), effective_date="2026-01-01")
         r = auth_client.get(self.url)
         assert r.data["data"] == []
+
+
+@pytest.mark.django_db
+class TestAdjustBalanceView:
+    url = "/api/wallet/adjust-balance/"
+
+    def test_adjust_balance_up_creates_income(self, auth_client, user):
+        from apps.transactions.models import Transaction
+        wallet = Wallet.objects.create(user=user)
+        r = auth_client.post(self.url, {"target_balance": "1000.00"})
+        assert r.status_code == 200
+        assert Decimal(str(r.data["data"]["balance"])) == Decimal("1000.00")
+        assert Transaction.objects.filter(wallet=wallet, type="income", description="Ajuste de saldo").exists()
+
+    def test_adjust_balance_down_creates_expense(self, auth_client, user):
+        from apps.transactions.models import Transaction
+        wallet = Wallet.objects.create(user=user)
+        Transaction.objects.create(user=user, wallet=wallet, amount=Decimal("500"), type="income", date="2026-01-01")
+        r = auth_client.post(self.url, {"target_balance": "200.00"})
+        assert r.status_code == 200
+        assert Decimal(str(r.data["data"]["balance"])) == Decimal("200.00")
+        assert Transaction.objects.filter(wallet=wallet, type="expense", description="Ajuste de saldo").exists()
+
+    def test_adjust_balance_same_returns_success(self, auth_client, user):
+        Wallet.objects.create(user=user)
+        r = auth_client.post(self.url, {"target_balance": "0"})
+        assert r.status_code == 200
+
+    def test_adjust_balance_invalid_value(self, auth_client, user):
+        Wallet.objects.create(user=user)
+        r = auth_client.post(self.url, {"target_balance": "abc"})
+        assert r.status_code == 400
+
+    def test_requires_auth(self, api_client):
+        r = api_client.post(self.url, {"target_balance": "100"})
+        assert r.status_code == 401

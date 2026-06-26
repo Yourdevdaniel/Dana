@@ -28,6 +28,10 @@ class TestDebtViews:
         r = auth_client.post(self.url, {"creditor": "Cred", "amount": "1000.00", "paid_amount": "300.00"})
         assert Decimal(str(r.data["data"]["remaining"])) == Decimal("700")
 
+    def test_remaining_clamped_to_zero_when_overpaid(self, auth_client, user):
+        debt = Debt.objects.create(user=user, creditor="C", amount=Decimal("100"), paid_amount=Decimal("150"))
+        assert debt.remaining == 0
+
     def test_negative_amount_rejected(self, auth_client):
         r = auth_client.post(self.url, {"creditor": "X", "amount": "-100.00"})
         assert r.status_code == 400
@@ -44,3 +48,33 @@ class TestDebtViews:
         debt = Debt.objects.create(user=other, creditor="Z", amount=Decimal("200"))
         r = auth_client.delete(f"/api/debts/{debt.id}/")
         assert r.status_code in (403, 404)
+
+    def test_patch_sets_status_paid_when_fully_paid(self, auth_client, user):
+        debt = Debt.objects.create(user=user, creditor="Banco", amount=Decimal("500"))
+        r = auth_client.patch(f"/api/debts/{debt.id}/", {"paid_amount": "500.00"})
+        assert r.status_code == 200
+        assert r.data["data"]["status"] == "paid"
+
+    def test_patch_accepts_explicit_status(self, auth_client, user):
+        debt = Debt.objects.create(user=user, creditor="Banco", amount=Decimal("300"))
+        r = auth_client.patch(f"/api/debts/{debt.id}/", {"status": "overdue"})
+        assert r.status_code == 200
+        assert r.data["data"]["status"] == "overdue"
+
+
+@pytest.mark.django_db
+class TestDebtPayEndpoint:
+    def test_pay_marks_debt_as_paid(self, auth_client, user):
+        debt = Debt.objects.create(user=user, creditor="Banco", amount=Decimal("1000"))
+        r = auth_client.post(f"/api/debts/{debt.id}/pay/")
+        assert r.status_code == 200
+        assert r.data["data"]["status"] == "paid"
+        assert Decimal(r.data["data"]["paid_amount"]) == Decimal("1000")
+        assert Decimal(r.data["data"]["remaining"]) == Decimal("0")
+
+    def test_pay_other_users_debt_not_found(self, auth_client, db):
+        from apps.users.models import User
+        other = User.objects.create_user(email="o3@d.com", name="O3", password="pass1234")
+        debt = Debt.objects.create(user=other, creditor="Banco", amount=Decimal("500"))
+        r = auth_client.post(f"/api/debts/{debt.id}/pay/")
+        assert r.status_code == 404

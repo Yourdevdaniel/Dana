@@ -33,7 +33,22 @@
       "Bash(curl -sv http://localhost:5173/api/test)",
       "Bash(curl -sv -X POST http://localhost:5173/api/auth/login/ -H 'Content-Type: application/json' -d '{\"email\":\"a@b.com\",\"password\":\"Teste@123\"}')",
       "Bash(curl -s http://localhost:8000/api/auth/register/ -X POST -H 'Content-Type: application/json' -d '{\"email\":\"direct@teste.com\",\"name\":\"Direct Test\",\"password\":\"Teste@123\"}')",
-      "Bash(curl -s -X POST http://localhost:8000/api/auth/register/ -H 'Content-Type: application/json' -d '{\"email\":\"backendok@teste.com\",\"name\":\"Backend OK\",\"password\":\"Teste@123\"}')"
+      "Bash(curl -s -X POST http://localhost:8000/api/auth/register/ -H 'Content-Type: application/json' -d '{\"email\":\"backendok@teste.com\",\"name\":\"Backend OK\",\"password\":\"Teste@123\"}')",
+      "Bash(npm install *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(python *)",
+      "Bash(git add *)",
+      "Bash(mkdir -p /c/Users/akira/OneDrive/Desktop/DaNa/backend/apps/investments/migrations)",
+      "Bash(mkdir -p /c/Users/akira/OneDrive/Desktop/DaNa/backend/apps/investments/tests)",
+      "Read(//c/Users/akira/AppData/Local/pypoetry/**)",
+      "Read(//c/Users/akira/AppData/Roaming/**)",
+      "Bash(pip show *)",
+      "PowerShell(Get-Command *)",
+      "PowerShell(py *)",
+      "PowerShell(docker --version 2>&1; docker ps 2>&1 | Select-Object -First 3)",
+      "PowerShell(Start-Process \"C:\\\\Program Files\\\\Docker\\\\Docker\\\\Docker Desktop.exe\" -ErrorAction SilentlyContinue; Start-Sleep -Seconds 5; docker ps 2>&1 | Select-Object -First 2)",
+      "Bash(git commit *)"
     ]
   }
 }

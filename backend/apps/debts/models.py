@@ -29,4 +29,4 @@ class Debt(BaseModel):
 
     @property
     def remaining(self):
-        return self.amount - self.paid_amount
+        return max(self.amount - self.paid_amount, 0)
