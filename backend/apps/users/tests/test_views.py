@@ -77,11 +77,21 @@ class TestProfileDetailView:
         assert r.status_code == 200
         assert r.data["data"]["name"] == "Other Person"
 
+    def test_public_fields_present(self, auth_client, other_user):
+        r = auth_client.get(self._url(other_user.id))
+        data = r.data["data"]
+        for field in ("id", "name", "avatar", "total_xp", "created_at", "featured_badges"):
+            assert field in data
+
+    def test_featured_badges_is_list(self, auth_client, other_user):
+        r = auth_client.get(self._url(other_user.id))
+        assert isinstance(r.data["data"]["featured_badges"], list)
+
     def test_no_sensitive_fields_in_detail(self, auth_client, other_user):
         r = auth_client.get(self._url(other_user.id))
         data = r.data["data"]
-        assert "email" not in data
-        assert "date_of_birth" not in data
+        for forbidden in ("email", "date_of_birth", "password", "is_staff", "is_active"):
+            assert forbidden not in data
 
     def test_not_found_returns_404(self, auth_client):
         import uuid

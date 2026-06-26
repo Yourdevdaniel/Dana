@@ -49,10 +49,15 @@ def _validate_base64_avatar(value):
 
 
 class PublicProfileSerializer(serializers.ModelSerializer):
+    featured_badges = serializers.SerializerMethodField()
+
     class Meta:
         model = User
-        fields = ["id", "name", "avatar", "total_xp", "created_at"]
+        fields = ["id", "name", "avatar", "total_xp", "created_at", "featured_badges"]
         read_only_fields = fields
+
+    def get_featured_badges(self, obj):
+        return []
 
 
 class UserSerializer(serializers.ModelSerializer):

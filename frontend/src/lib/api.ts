@@ -169,6 +169,7 @@ export type PublicProfile = {
   avatar: string | null;
   total_xp: number;
   created_at: string;
+  featured_badges?: BadgeAward[];
 };
 
 export type ProfileUpdatePayload = {

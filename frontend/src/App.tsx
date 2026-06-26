@@ -66,6 +66,7 @@ import {
   FixedExpense,
   Goal,
   RankingItem,
+  PublicProfile,
   readSession,
   Salary,
   saveSession,
@@ -1628,7 +1629,7 @@ function FixedExpensesPage({ data, refresh }: FormProps) {
   );
 }
 
-function CouplePage({ data, refresh, user }: FormProps & { user: User }) {
+function CouplePage({ data, refresh, user, onViewProfile }: FormProps & { user: User; onViewProfile: (userId: string) => void }) {
   const [groupName, setGroupName] = useState("");
   const [inviteCode, setInviteCode] = useState("");
   const [editName, setEditName] = useState(data.couple?.name ?? "");
@@ -1734,7 +1735,12 @@ function CouplePage({ data, refresh, user }: FormProps & { user: User }) {
             <p className="rounded-md bg-white/[0.04] p-3 text-sm">Código de convite: <strong>{data.couple.invite_code}</strong></p>
             <div className="grid gap-2">
               {data.couple.members.map((member) => (
-                <div key={member.id} className="flex items-center justify-between gap-3 rounded-md bg-white/[0.04] p-3">
+                <button
+                  key={member.id}
+                  type="button"
+                  className="flex items-center justify-between gap-3 rounded-md bg-white/[0.04] p-3 text-left transition hover:bg-white/[0.07]"
+                  onClick={() => onViewProfile(member.id)}
+                >
                   <div className="flex min-w-0 items-center gap-3">
                     <div className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-md bg-white/5">
                       {member.avatar ? (
@@ -1749,7 +1755,7 @@ function CouplePage({ data, refresh, user }: FormProps & { user: User }) {
                     </div>
                   </div>
                   <strong className="shrink-0 text-sm text-white">{member.total_xp} XP</strong>
-                </div>
+                </button>
               ))}
             </div>
             <Button type="button" variant="ghost" className="justify-self-start text-pink-200" onClick={leaveCouple}>
@@ -2310,7 +2316,114 @@ function ProfilePage({
   );
 }
 
-function SocialPage({ ranking, user }: { ranking: RankingItem[]; user: User }) {
+function PublicProfileModal({
+  profileId,
+  currentUser,
+  localBadges,
+  onClose,
+}: {
+  profileId: string | null;
+  currentUser: User;
+  localBadges: BadgeAward[];
+  onClose: () => void;
+}) {
+  const [profile, setProfile] = useState<PublicProfile | null>(null);
+  const [loadingProfile, setLoadingProfile] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!profileId) {
+      setProfile(null);
+      setError("");
+      return;
+    }
+
+    let cancelled = false;
+    setLoadingProfile(true);
+    setError("");
+    void api.get<ApiResponse<PublicProfile>>(`/users/profiles/${profileId}/`).then((response) => {
+      if (!cancelled) setProfile(response.data.data);
+    }).catch((err) => {
+      if (!cancelled) setError(apiErrorMessage(err));
+    }).finally(() => {
+      if (!cancelled) setLoadingProfile(false);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [profileId]);
+
+  if (!profileId) return null;
+
+  const localFeaturedBadgeIds = (() => {
+    try {
+      const raw = localStorage.getItem(`finance-couple:featured-badges:${currentUser.id}`);
+      return raw ? (JSON.parse(raw) as string[]) : [];
+    } catch {
+      return [];
+    }
+  })();
+  const badges = profile?.id === currentUser.id
+    ? localBadges.filter((item) => localFeaturedBadgeIds.includes(item.id))
+    : profile?.featured_badges ?? [];
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 px-4 py-8" role="dialog" aria-modal="true">
+      <Card className="w-full max-w-lg p-5">
+        <div className="mb-5 flex items-start justify-between gap-4">
+          <div>
+            <p className="text-sm text-slate-400">Perfil público</p>
+            <h2 className="text-xl font-semibold text-white">{profile?.name ?? "Carregando perfil"}</h2>
+          </div>
+          <Button type="button" variant="ghost" className="h-9 px-3" onClick={onClose}>
+            Fechar
+          </Button>
+        </div>
+
+        {loadingProfile && <p className="rounded-md bg-white/[0.04] p-3 text-sm text-slate-300">Carregando perfil...</p>}
+        {error && <p className="rounded-md bg-pink-500/10 p-3 text-sm text-pink-200">{error}</p>}
+
+        {profile && (
+          <div className="grid gap-5">
+            <div className="flex items-center gap-4">
+              <div className="grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-md bg-white/5">
+                {profile.avatar ? (
+                  <img src={profile.avatar} alt={profile.name} className="h-full w-full object-cover" />
+                ) : (
+                  <span className="text-xl font-semibold text-white">{userInitials(profile.name)}</span>
+                )}
+              </div>
+              <div className="min-w-0">
+                <p className="truncate text-lg font-semibold text-white">{profile.name}</p>
+                <p className="text-sm text-slate-400">{profile.total_xp} XP total</p>
+                <p className="text-xs text-slate-500">Criado em {new Date(profile.created_at).toLocaleDateString("pt-BR")}</p>
+              </div>
+            </div>
+
+            <div>
+              <h3 className="mb-3 text-sm font-semibold text-white">Badges em destaque</h3>
+              {badges.length ? (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {badges.map((item) => (
+                    <div key={item.id} className="rounded-md bg-white/[0.04] p-3">
+                      <p className="text-sm font-medium text-white">{item.badge.name}</p>
+                      <p className="text-xs text-slate-400">{item.badge.description}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <EmptyState title="Nenhuma badge pública em destaque." />
+              )}
+            </div>
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+}
+
+function SocialPage({ ranking, user, onViewProfile }: { ranking: RankingItem[]; user: User; onViewProfile: (userId: string) => void }) {
   const currentUserRank = ranking.find((item) => item.user.id === user.id);
 
   return (
@@ -2338,7 +2451,15 @@ function SocialPage({ ranking, user }: { ranking: RankingItem[]; user: User }) {
           items={ranking}
           empty="Nenhum ranking encontrado."
           render={(item) => (
-            <div key={item.user.id} className={cn("flex items-center justify-between gap-3 rounded-md p-3", item.user.id === user.id ? "bg-secondary/10 ring-1 ring-secondary/30" : "bg-white/[0.04]")}>
+            <button
+              key={item.user.id}
+              type="button"
+              className={cn(
+                "flex w-full items-center justify-between gap-3 rounded-md p-3 text-left transition hover:bg-white/[0.07]",
+                item.user.id === user.id ? "bg-secondary/10 ring-1 ring-secondary/30" : "bg-white/[0.04]",
+              )}
+              onClick={() => onViewProfile(item.user.id)}
+            >
               <div className="flex min-w-0 items-center gap-3">
                 <div className="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-white/10 text-sm font-semibold text-white">
                   #{item.rank}
@@ -2356,7 +2477,7 @@ function SocialPage({ ranking, user }: { ranking: RankingItem[]; user: User }) {
                 </div>
               </div>
               <strong className="shrink-0 text-sm text-white">{item.total_xp} XP</strong>
-            </div>
+            </button>
           )}
         />
       </Card>
@@ -2392,6 +2513,7 @@ export function App() {
   const [authState, setAuthState] = useState<"checking" | "authenticated" | "anonymous">(() => (readSession() ? "checking" : "anonymous"));
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
   const [openNavSections, setOpenNavSections] = useState<Record<string, boolean>>({
     overview: true,
     money: true,
@@ -2585,13 +2707,20 @@ export function App() {
         {data.couple?.members?.length ? (
           <div className={cn("mt-4 flex items-center gap-2", sidebarCollapsed && "lg:flex-col")}>
             {data.couple.members.slice(0, 4).map((member) => (
-              <div key={member.id} className="grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-md bg-white/5" title={member.name}>
+              <button
+                key={member.id}
+                type="button"
+                className="grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-md bg-white/5 transition hover:bg-white/10"
+                title={member.name}
+                aria-label={`Abrir perfil de ${member.name}`}
+                onClick={() => setSelectedProfileId(member.id)}
+              >
                 {member.avatar ? (
                   <img src={member.avatar} alt={member.name} className="h-full w-full object-cover" />
                 ) : (
                   <span className="text-xs font-semibold text-white">{userInitials(member.name)}</span>
                 )}
-              </div>
+              </button>
             ))}
           </div>
         ) : null}
@@ -2693,10 +2822,10 @@ export function App() {
           {page === "investments" && <InvestmentsPage data={data} user={session.user} />}
           {page === "debts" && <DebtsPage data={data} refresh={loadData} />}
           {page === "fixed" && <FixedExpensesPage data={data} refresh={loadData} />}
-          {page === "couple" && <CouplePage data={data} refresh={loadData} user={session.user} />}
+          {page === "couple" && <CouplePage data={data} refresh={loadData} user={session.user} onViewProfile={setSelectedProfileId} />}
           {page === "achievements" && <AchievementsPage data={data} user={session.user} />}
           {page === "profile" && <ProfilePage data={data} refresh={loadData} user={session.user} onUserChange={(updated) => setSession((current) => (current ? { ...current, user: updated } : current))} onDeleteAccount={logout} />}
-          {page === "social" && <SocialPage ranking={data.ranking} user={session.user} />}
+          {page === "social" && <SocialPage ranking={data.ranking} user={session.user} onViewProfile={setSelectedProfileId} />}
           <footer className="mt-10 border-t border-white/10 py-5 text-center text-xs text-slate-500">
             Todos os direitos reservados a{" "}
             <a
@@ -2711,6 +2840,12 @@ export function App() {
           </footer>
         </div>
       </main>
+      <PublicProfileModal
+        profileId={selectedProfileId}
+        currentUser={session.user}
+        localBadges={data.badges}
+        onClose={() => setSelectedProfileId(null)}
+      />
     </div>
   );
 }
