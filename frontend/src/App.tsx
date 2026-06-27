@@ -323,6 +323,27 @@ const quickCategories = [
   { name: "Transporte", type: "expense", icon: "car", color: "#2563EB" },
 ] satisfies Array<{ name: string; type: "income" | "expense"; icon: string; color: string }>;
 
+const categoryIconOptions = [
+  { value: "tag", label: "Geral" },
+  { value: "briefcase", label: "Trabalho e salário" },
+  { value: "wallet", label: "Carteira e depósito" },
+  { value: "shopping-cart", label: "Mercado e compras" },
+  { value: "receipt", label: "Contas e boletos" },
+  { value: "home", label: "Casa e moradia" },
+  { value: "car", label: "Transporte" },
+  { value: "utensils", label: "Alimentação" },
+  { value: "heart-pulse", label: "Saúde" },
+  { value: "book-open", label: "Educação" },
+  { value: "film", label: "Lazer e entretenimento" },
+  { value: "repeat", label: "Assinaturas" },
+  { value: "plane", label: "Viagens" },
+  { value: "gift", label: "Presentes" },
+] satisfies Array<{ value: string; label: string }>;
+
+function categoryIconLabel(icon: string) {
+  return categoryIconOptions.find((option) => option.value === icon)?.label ?? "Geral";
+}
+
 const investmentTypeLabels: Record<InvestmentAssetType, string> = {
   renda_fixa: "Renda fixa",
   acoes: "Ações",
@@ -1337,7 +1358,7 @@ function TransactionsPage({ data, refresh }: FormProps) {
 }
 
 function CategoriesPage({ data, refresh }: FormProps) {
-  const [form, setForm] = useState({ name: "", type: "expense", icon: "", color: "#7C3AED" });
+  const [form, setForm] = useState({ name: "", type: "expense", icon: "tag", color: "#7C3AED" });
   const [error, setError] = useState("");
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -1345,7 +1366,7 @@ function CategoriesPage({ data, refresh }: FormProps) {
     setError("");
     try {
       await api.post("/categories/", form);
-      setForm({ name: "", type: "expense", icon: "", color: "#7C3AED" });
+      setForm({ name: "", type: "expense", icon: "tag", color: "#7C3AED" });
       await refresh();
     } catch (err) {
       setError(apiErrorMessage(err));
@@ -1394,7 +1415,13 @@ function CategoriesPage({ data, refresh }: FormProps) {
             <option value="income">Receita</option>
           </NativeSelect>
         </Field>
-        <Field label="Ícone"><Input value={form.icon} onChange={(event) => setForm({ ...form, icon: event.target.value })} /></Field>
+        <Field label="Ícone">
+          <NativeSelect value={form.icon} onChange={(event) => setForm({ ...form, icon: event.target.value })}>
+            {categoryIconOptions.map((option) => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </NativeSelect>
+        </Field>
         <Field label="Cor"><Input value={form.color} onChange={(event) => setForm({ ...form, color: event.target.value })} type="color" /></Field>
         {error && <p className="text-sm text-pink-200">{error}</p>}
         <Button type="submit">Salvar categoria</Button>
@@ -1409,7 +1436,7 @@ function CategoriesPage({ data, refresh }: FormProps) {
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <span className="text-sm text-slate-300">{category.icon}</span>
+            <span className="text-sm text-slate-300">{categoryIconLabel(category.icon)}</span>
             {!category.is_system && (
               <Button type="button" variant="ghost" className="h-9 w-9 p-0" aria-label="Apagar categoria" onClick={() => removeCategory(category)}>
                 <Trash2 className="h-4 w-4" aria-hidden="true" />
@@ -1851,12 +1878,17 @@ function DebtsPage({ data, refresh }: FormProps) {
         }} />
       </ResourcePage>
 
-      <section className="grid gap-6 lg:grid-cols-[1fr_360px]">
-        <Card className="p-5">
-          <h2 className="mb-4 text-lg font-semibold text-white">Cartão de crédito</h2>
-          <div className="mb-4 rounded-md border border-amber-400/30 bg-amber-400/10 p-3 text-sm text-amber-100">
-            Nunca informe número do cartão, CVV, senha ou dados completos. O app só precisa de apelido, limite, dívida e datas.
+      <Card className="p-5">
+        <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold text-white">Cartão de crédito</h2>
+            <p className="mt-1 text-sm text-slate-400">Opcional, para acompanhar fatura, limite, fechamento e vencimento.</p>
           </div>
+          <div className="mb-4 rounded-md border border-amber-400/30 bg-amber-400/10 p-3 text-sm text-amber-100">
+            Nunca informe número do cartão, CVV, senha ou dados completos.
+          </div>
+        </div>
+        <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
           <DataList items={data.creditCards} empty="Nenhum cartão cadastrado." render={(card) => {
             const debt = toNumber(card.current_debt);
             const limit = toNumber(card.limit_amount);
@@ -1868,7 +1900,7 @@ function DebtsPage({ data, refresh }: FormProps) {
             return (
               <div key={card.id} className={cn("rounded-md p-3", nearLimit || dueDays <= 7 ? "bg-pink-400/10 ring-1 ring-pink-400/30" : "bg-white/[0.04]")}>
                 <div className="flex items-start justify-between gap-3">
-                  <div>
+                  <div className="min-w-0">
                     <p className="text-sm font-medium text-white">{card.nickname}</p>
                     <p className="text-xs text-slate-400">Fecha dia {card.closing_day}, vence dia {card.due_day}</p>
                   </div>
@@ -1889,21 +1921,20 @@ function DebtsPage({ data, refresh }: FormProps) {
               </div>
             );
           }} />
-        </Card>
-
-        <Card className="p-5">
-          <h2 className="mb-4 text-lg font-semibold text-white">Novo cartão</h2>
-          <form className="grid gap-3" onSubmit={submitCreditCard}>
+          <form className="grid gap-3 rounded-md bg-white/[0.04] p-3" onSubmit={submitCreditCard}>
+            <h3 className="text-sm font-semibold text-white">Novo cartão</h3>
             <Field label="Apelido do cartão"><Input value={cardForm.nickname} onChange={(event) => setCardForm({ ...cardForm, nickname: event.target.value })} placeholder="Ex: Cartão principal" required /></Field>
             <Field label="Quanto está devendo"><MoneyInput value={cardForm.current_debt} onValueChange={(value) => setCardForm({ ...cardForm, current_debt: value })} required /></Field>
             <Field label="Limite total"><MoneyInput value={cardForm.limit_amount} onValueChange={(value) => setCardForm({ ...cardForm, limit_amount: value })} required /></Field>
             <Field label="Juros ao mês (%)"><Input value={cardForm.interest_rate} onChange={(event) => setCardForm({ ...cardForm, interest_rate: event.target.value })} inputMode="decimal" /></Field>
-            <Field label="Dia que fecha"><Input value={cardForm.closing_day} onChange={(event) => setCardForm({ ...cardForm, closing_day: event.target.value })} type="number" min="1" max="31" required /></Field>
-            <Field label="Dia que vence"><Input value={cardForm.due_day} onChange={(event) => setCardForm({ ...cardForm, due_day: event.target.value })} type="number" min="1" max="31" required /></Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Fecha dia"><Input value={cardForm.closing_day} onChange={(event) => setCardForm({ ...cardForm, closing_day: event.target.value })} type="number" min="1" max="31" required /></Field>
+              <Field label="Vence dia"><Input value={cardForm.due_day} onChange={(event) => setCardForm({ ...cardForm, due_day: event.target.value })} type="number" min="1" max="31" required /></Field>
+            </div>
             <Button type="submit">Salvar cartão</Button>
           </form>
-        </Card>
-      </section>
+        </div>
+      </Card>
     </div>
   );
 }
