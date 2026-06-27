@@ -1,6 +1,7 @@
 import { FormEvent, cloneElement, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import type { ReactElement, ReactNode } from "react";
 import {
+  AlertTriangle,
   BadgeCheck,
   Banknote,
   Bell,
@@ -124,6 +125,17 @@ type ScheduledNudge = {
   created_at: string;
 };
 
+type CreditCardAccount = {
+  id: string;
+  nickname: string;
+  current_debt: string;
+  limit_amount: string;
+  interest_rate: string;
+  closing_day: number;
+  due_day: number;
+  created_at: string;
+};
+
 type Investment = {
   id: string;
   name: string;
@@ -157,6 +169,7 @@ type AppData = {
   investments: Investment[];
   debts: Debt[];
   fixedExpenses: FixedExpense[];
+  creditCards: CreditCardAccount[];
   badges: BadgeAward[];
   xpHistory: XPHistory[];
   ranking: RankingItem[];
@@ -175,6 +188,7 @@ const emptyData: AppData = {
   investments: [],
   debts: [],
   fixedExpenses: [],
+  creditCards: [],
   badges: [],
   xpHistory: [],
   ranking: [],
@@ -281,6 +295,34 @@ function today() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function daysUntilDate(date: string | null | undefined) {
+  if (!date) return null;
+  const target = new Date(`${date}T00:00:00`);
+  const now = new Date();
+  const todayOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return Math.ceil((target.getTime() - todayOnly.getTime()) / 86400000);
+}
+
+function daysUntilMonthDay(day: number) {
+  const now = new Date();
+  const todayOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const clampedDay = Math.max(1, Math.min(31, day));
+  let target = new Date(now.getFullYear(), now.getMonth(), clampedDay);
+  if (target < todayOnly) {
+    target = new Date(now.getFullYear(), now.getMonth() + 1, clampedDay);
+  }
+  return Math.ceil((target.getTime() - todayOnly.getTime()) / 86400000);
+}
+
+const quickCategories = [
+  { name: "Salário", type: "income", icon: "briefcase", color: "#16A34A" },
+  { name: "Depósito", type: "income", icon: "wallet", color: "#0D9488" },
+  { name: "Assinatura", type: "expense", icon: "repeat", color: "#8B5CF6" },
+  { name: "Entretenimento", type: "expense", icon: "film", color: "#F97316" },
+  { name: "Mercado", type: "expense", icon: "shopping-cart", color: "#EC4899" },
+  { name: "Transporte", type: "expense", icon: "car", color: "#2563EB" },
+] satisfies Array<{ name: string; type: "income" | "expense"; icon: string; color: string }>;
+
 const investmentTypeLabels: Record<InvestmentAssetType, string> = {
   renda_fixa: "Renda fixa",
   acoes: "Ações",
@@ -309,60 +351,6 @@ function readInvestments(userId: string): Investment[] {
 
 function saveInvestments(userId: string, investments: Investment[]) {
   localStorage.setItem(investmentStorageKey(userId), JSON.stringify(investments));
-}
-
-function profilePrivacyStorageKey(userId: string) {
-  return `finance-couple:profile-privacy:${userId}`;
-}
-
-function readProfilePrivacy(userId: string): ProfilePrivacySettings {
-  try {
-    const raw = localStorage.getItem(profilePrivacyStorageKey(userId));
-    return raw ? { showGroupOnProfile: true, showMembershipOnOtherProfiles: true, ...JSON.parse(raw) } : {
-      showGroupOnProfile: true,
-      showMembershipOnOtherProfiles: true,
-    };
-  } catch {
-    return { showGroupOnProfile: true, showMembershipOnOtherProfiles: true };
-  }
-}
-
-function saveProfilePrivacy(userId: string, settings: ProfilePrivacySettings) {
-  localStorage.setItem(profilePrivacyStorageKey(userId), JSON.stringify(settings));
-}
-
-function friendsStorageKey(userId: string) {
-  return `finance-couple:friends:${userId}`;
-}
-
-function readLocalFriends(userId: string): LocalFriend[] {
-  try {
-    const raw = localStorage.getItem(friendsStorageKey(userId));
-    return raw ? (JSON.parse(raw) as LocalFriend[]) : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveLocalFriends(userId: string, friends: LocalFriend[]) {
-  localStorage.setItem(friendsStorageKey(userId), JSON.stringify(friends));
-}
-
-function nudgesStorageKey(userId: string) {
-  return `finance-couple:nudges:${userId}`;
-}
-
-function readScheduledNudges(userId: string): ScheduledNudge[] {
-  try {
-    const raw = localStorage.getItem(nudgesStorageKey(userId));
-    return raw ? (JSON.parse(raw) as ScheduledNudge[]) : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveScheduledNudges(userId: string, nudges: ScheduledNudge[]) {
-  localStorage.setItem(nudgesStorageKey(userId), JSON.stringify(nudges));
 }
 
 function coupleAvatarStorageKey(coupleId: string) {
@@ -824,6 +812,7 @@ function DashboardPage({
 
       {mode === "solo" ? (
         <>
+          <DeadlineAlerts data={data} />
           <MetricGrid dashboard={data.dashboard} />
           <section className="grid gap-6 xl:grid-cols-[1fr_380px]">
             <CashflowChart dashboard={data.dashboard} />
@@ -831,11 +820,13 @@ function DashboardPage({
               <RecentTransactions transactions={data.transactions} />
               <GoalsSummary goals={data.goals} />
               <DebtsSummary debts={data.debts} setPage={setPage} />
+              <CreditCardSummary cards={data.creditCards} setPage={setPage} />
             </div>
           </section>
         </>
       ) : (
         <>
+          <DeadlineAlerts data={data} />
           <MetricGrid dashboard={activeDashboard} />
           <section className="grid gap-6 xl:grid-cols-[1fr_380px]">
             <CoupleSummaryPanel items={data.coupleDashboard} />
@@ -843,6 +834,7 @@ function DashboardPage({
               <RecentTransactions transactions={data.transactions} />
               <GoalsSummary goals={data.goals} />
               <DebtsSummary debts={data.debts} setPage={setPage} />
+              <CreditCardSummary cards={data.creditCards} setPage={setPage} />
             </div>
           </section>
         </>
@@ -993,6 +985,97 @@ function DebtsSummary({ debts, setPage }: { debts: Debt[]; setPage: (page: Page)
   );
 }
 
+function DeadlineAlerts({ data }: { data: AppData }) {
+  const balance = toNumber(data.wallet?.balance);
+  const upcomingDebts = data.debts
+    .filter((debt) => debt.status !== "paid" && toNumber(debt.remaining) > 0)
+    .map((debt) => ({ debt, days: daysUntilDate(debt.due_date) }))
+    .filter((item): item is { debt: Debt; days: number } => item.days !== null && item.days >= 0 && item.days <= 7);
+  const upcomingFixed = data.fixedExpenses
+    .filter((item) => !item.is_paid_this_month)
+    .map((item) => ({ item, days: daysUntilMonthDay(item.due_day) }))
+    .filter((entry) => entry.days <= 7);
+  const upcomingCards = data.creditCards
+    .map((card) => ({ card, dueDays: daysUntilMonthDay(card.due_day), closeDays: daysUntilMonthDay(card.closing_day) }))
+    .filter((entry) => toNumber(entry.card.current_debt) > 0 && (entry.dueDays <= 7 || entry.closeDays <= 7));
+  const totalUpcoming = upcomingDebts.reduce((sum, item) => sum + toNumber(item.debt.remaining), 0)
+    + upcomingFixed.reduce((sum, item) => sum + toNumber(item.item.amount), 0)
+    + upcomingCards.reduce((sum, item) => sum + toNumber(item.card.current_debt), 0);
+
+  if (!upcomingDebts.length && !upcomingFixed.length && !upcomingCards.length) return null;
+
+  return (
+    <Card className="border-amber-400/30 bg-amber-400/10 p-5">
+      <div className="mb-4 flex items-start gap-3">
+        <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-300" aria-hidden="true" />
+        <div>
+          <h2 className="text-lg font-semibold text-white">Atenção aos próximos pagamentos</h2>
+          <p className="text-sm text-amber-100">
+            Existem cobranças próximas. Total aproximado: {formatCurrency(totalUpcoming)}. Seu saldo atual {balance >= totalUpcoming ? "cobre" : "não cobre"} esse valor.
+          </p>
+        </div>
+      </div>
+      <div className="grid gap-3 lg:grid-cols-3">
+        {upcomingDebts.map(({ debt, days }) => (
+          <div key={debt.id} className="rounded-md bg-black/15 p-3">
+            <p className="text-sm font-medium text-white">{debt.creditor}</p>
+            <p className="text-xs text-amber-100">Dívida vence em {days} dia(s): {formatCurrency(toNumber(debt.remaining))}</p>
+          </div>
+        ))}
+        {upcomingFixed.map(({ item, days }) => (
+          <div key={item.id} className="rounded-md bg-black/15 p-3">
+            <p className="text-sm font-medium text-white">{item.name}</p>
+            <p className="text-xs text-amber-100">Conta fixa vence em {days} dia(s): {formatCurrency(toNumber(item.amount))}</p>
+          </div>
+        ))}
+        {upcomingCards.map(({ card, dueDays, closeDays }) => (
+          <div key={card.id} className="rounded-md bg-black/15 p-3">
+            <p className="text-sm font-medium text-white">{card.nickname}</p>
+            <p className="text-xs text-amber-100">
+              Fecha em {closeDays} dia(s), vence em {dueDays} dia(s). Fatura: {formatCurrency(toNumber(card.current_debt))}
+            </p>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+function CreditCardSummary({ cards, setPage }: { cards: CreditCardAccount[]; setPage: (page: Page) => void }) {
+  const totalDebt = cards.reduce((sum, card) => sum + toNumber(card.current_debt), 0);
+  const totalLimit = cards.reduce((sum, card) => sum + toNumber(card.limit_amount), 0);
+  const usage = totalLimit > 0 ? (totalDebt / totalLimit) * 100 : 0;
+  const highUsage = usage >= 80;
+
+  return (
+    <Card className={cn("p-5", highUsage && "border-pink-400/30 bg-pink-400/10")}>
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold text-white">Cartão de crédito</h2>
+          <p className="text-sm text-slate-400">{formatCurrency(totalDebt)} em faturas</p>
+        </div>
+        <Button type="button" variant="ghost" className="h-9 px-3" onClick={() => setPage("debts")}>Ver</Button>
+      </div>
+      {cards.length ? (
+        <div className="space-y-3">
+          <Progress value={Math.min(100, usage)} />
+          <p className={cn("text-xs", highUsage ? "text-pink-100" : "text-slate-400")}>
+            Uso do limite: {usage.toFixed(0)}%. Evite informar número, CVV ou senha do cartão. O app nunca pede esses dados.
+          </p>
+          {cards.slice(0, 2).map((card) => (
+            <div key={card.id} className="rounded-md bg-white/[0.04] p-3 text-sm">
+              <p className="font-medium text-white">{card.nickname}</p>
+              <p className="text-xs text-slate-400">Fecha dia {card.closing_day}, vence dia {card.due_day}</p>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <EmptyState title="Nenhum cartão cadastrado." />
+      )}
+    </Card>
+  );
+}
+
 type FormProps = {
   data: AppData;
   refresh: () => Promise<void>;
@@ -1004,6 +1087,8 @@ function WalletPage({ data, refresh }: FormProps) {
   const [targetBalance, setTargetBalance] = useState("");
   const [date, setDate] = useState(today());
   const [note, setNote] = useState("");
+  const [editingSalaryId, setEditingSalaryId] = useState<string | null>(null);
+  const [salaryEdit, setSalaryEdit] = useState({ amount: "", effective_date: today(), note: "" });
   const [error, setError] = useState("");
 
   async function submitSalary(event: FormEvent<HTMLFormElement>) {
@@ -1013,6 +1098,40 @@ function WalletPage({ data, refresh }: FormProps) {
       await api.post("/wallet/salary/", { amount: salary, effective_date: date, note });
       setSalary("");
       setNote("");
+      await refresh();
+    } catch (err) {
+      setError(apiErrorMessage(err));
+    }
+  }
+
+  function startEditSalary(item: Salary) {
+    setEditingSalaryId(item.id);
+    setSalaryEdit({ amount: item.amount, effective_date: item.effective_date, note: item.note });
+    setError("");
+  }
+
+  async function updateSalary(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!editingSalaryId) return;
+    setError("");
+    try {
+      await api.patch(`/wallet/salary/${editingSalaryId}/`, salaryEdit);
+      setEditingSalaryId(null);
+      setSalaryEdit({ amount: "", effective_date: today(), note: "" });
+      await refresh();
+    } catch (err) {
+      setError(apiErrorMessage(err));
+    }
+  }
+
+  async function deleteSalary(item: Salary) {
+    setError("");
+    try {
+      await api.delete(`/wallet/salary/${item.id}/`);
+      if (editingSalaryId === item.id) {
+        setEditingSalaryId(null);
+        setSalaryEdit({ amount: "", effective_date: today(), note: "" });
+      }
       await refresh();
     } catch (err) {
       setError(apiErrorMessage(err));
@@ -1071,10 +1190,36 @@ function WalletPage({ data, refresh }: FormProps) {
         <h3 className="mt-8 text-base font-semibold text-white">Salários registrados</h3>
         <div className="mt-3 space-y-2">
           {data.salaries.length ? data.salaries.map((item) => (
-            <div key={item.id} className="flex justify-between rounded-md bg-white/[0.04] p-3 text-sm">
-              <span>{item.effective_date} {item.note && `- ${item.note}`}</span>
-              <strong>{formatCurrency(toNumber(item.amount))}</strong>
-            </div>
+            editingSalaryId === item.id ? (
+              <form key={item.id} className="grid gap-3 rounded-md bg-white/[0.04] p-3" onSubmit={updateSalary}>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <Field label="Valor">
+                    <MoneyInput value={salaryEdit.amount} onValueChange={(value) => setSalaryEdit({ ...salaryEdit, amount: value })} required />
+                  </Field>
+                  <Field label="Data">
+                    <Input value={salaryEdit.effective_date} onChange={(event) => setSalaryEdit({ ...salaryEdit, effective_date: event.target.value })} type="date" required />
+                  </Field>
+                  <Field label="Observação">
+                    <Input value={salaryEdit.note} onChange={(event) => setSalaryEdit({ ...salaryEdit, note: event.target.value })} />
+                  </Field>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button type="submit" className="h-9 px-3">Salvar</Button>
+                  <Button type="button" variant="ghost" className="h-9 px-3" onClick={() => setEditingSalaryId(null)}>Cancelar</Button>
+                </div>
+              </form>
+            ) : (
+              <div key={item.id} className="flex flex-wrap items-center justify-between gap-3 rounded-md bg-white/[0.04] p-3 text-sm">
+                <div className="min-w-0">
+                  <p className="font-medium text-white">{formatCurrency(toNumber(item.amount))}</p>
+                  <p className="truncate text-xs text-slate-400">{item.effective_date} {item.note && `- ${item.note}`}</p>
+                </div>
+                <div className="flex gap-2">
+                  <Button type="button" variant="secondary" className="h-9 px-3" onClick={() => startEditSalary(item)}>Editar</Button>
+                  <Button type="button" variant="ghost" className="h-9 px-3 text-pink-200" onClick={() => void deleteSalary(item)}>Apagar</Button>
+                </div>
+              </div>
+            )
           )) : <EmptyState title="Nenhum salário cadastrado." />}
         </div>
       </Card>
@@ -1212,9 +1357,36 @@ function CategoriesPage({ data, refresh }: FormProps) {
     await deleteAndRefresh(`/categories/${category.id}/`, refresh, setError);
   }
 
+  async function createQuickCategory(category: (typeof quickCategories)[number]) {
+    setError("");
+    try {
+      await api.post("/categories/", category);
+      await refresh();
+    } catch (err) {
+      setError(apiErrorMessage(err));
+    }
+  }
+
   return (
     <ResourcePage title="Categorias" formTitle="Nova categoria">
       <form className="grid gap-3" onSubmit={submit}>
+        <div className="grid gap-2">
+          <p className="text-sm text-slate-300">Categorias rápidas</p>
+          <div className="grid grid-cols-2 gap-2">
+            {quickCategories.map((category) => (
+              <Button
+                key={`${category.type}-${category.name}`}
+                type="button"
+                variant="secondary"
+                className="h-auto justify-start px-3 py-2 text-left"
+                onClick={() => void createQuickCategory(category)}
+              >
+                <Plus className="h-4 w-4" aria-hidden="true" />
+                {category.name}
+              </Button>
+            ))}
+          </div>
+        </div>
         <Field label="Nome"><Input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required /></Field>
         <Field label="Tipo">
           <NativeSelect value={form.type} onChange={(event) => setForm({ ...form, type: event.target.value })}>
@@ -1587,6 +1759,7 @@ function InvestmentsPage({ data, user }: { data: AppData; user: User }) {
 
 function DebtsPage({ data, refresh }: FormProps) {
   const [form, setForm] = useState({ creditor: "", amount: "", paid_amount: "0", due_date: "", description: "" });
+  const [cardForm, setCardForm] = useState({ nickname: "", current_debt: "", limit_amount: "", interest_rate: "0", closing_day: "1", due_day: "10" });
   const [error, setError] = useState("");
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -1615,44 +1788,123 @@ function DebtsPage({ data, refresh }: FormProps) {
     await deleteAndRefresh(`/debts/${debt.id}/`, refresh, setError);
   }
 
+  async function submitCreditCard(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError("");
+    try {
+      await api.post("/credit-cards/", {
+        ...cardForm,
+        closing_day: Number(cardForm.closing_day),
+        due_day: Number(cardForm.due_day),
+      });
+      setCardForm({ nickname: "", current_debt: "", limit_amount: "", interest_rate: "0", closing_day: "1", due_day: "10" });
+      await refresh();
+    } catch (err) {
+      setError(apiErrorMessage(err));
+    }
+  }
+
+  async function removeCreditCard(card: CreditCardAccount) {
+    await deleteAndRefresh(`/credit-cards/${card.id}/`, refresh, setError);
+  }
+
   return (
-    <ResourcePage title="Dívidas" formTitle="Nova dívida">
-      <form className="grid gap-3" onSubmit={submit}>
-        <Field label="Credor"><Input value={form.creditor} onChange={(event) => setForm({ ...form, creditor: event.target.value })} required /></Field>
-        <Field label="Valor"><MoneyInput value={form.amount} onValueChange={(value) => setForm({ ...form, amount: value })} required /></Field>
-        <Field label="Valor pago"><MoneyInput value={form.paid_amount} onValueChange={(value) => setForm({ ...form, paid_amount: value })} /></Field>
-        <Field label="Vencimento"><Input value={form.due_date} onChange={(event) => setForm({ ...form, due_date: event.target.value })} type="date" /></Field>
-        <Field label="Descrição"><Input value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} /></Field>
-        {error && <p className="text-sm text-pink-200">{error}</p>}
-        <Button type="submit">Salvar dívida</Button>
-      </form>
-      <DataList items={data.debts} empty="Nenhuma dívida cadastrada." render={(debt) => {
-        const completed = toNumber(debt.remaining) <= 0 || debt.status === "paid";
-        return (
-          <div key={debt.id} className="grid gap-3 rounded-md bg-white/[0.04] p-3 sm:grid-cols-[1fr_auto] sm:items-center">
-            <div className="min-w-0">
-              <p className="truncate text-sm font-medium text-white">{debt.creditor}</p>
-              <p className="truncate text-xs text-slate-400">
-                {completed ? "Completa" : `Restante: ${formatCurrency(toNumber(debt.remaining))}`}
-              </p>
-            </div>
-            <div className="flex items-center justify-between gap-2 sm:justify-end">
-              <strong className={cn("text-sm", completed ? "text-emerald-300" : "text-white")}>
-                {formatCurrency(toNumber(debt.amount))}
-              </strong>
-              {!completed && (
-                <Button type="button" variant="secondary" className="h-9 px-3" onClick={() => markDebtPaid(debt)}>
-                  Paga
+    <div className="grid gap-6">
+      <ResourcePage title="Dívidas" formTitle="Nova dívida">
+        <form className="grid gap-3" onSubmit={submit}>
+          <Field label="Credor"><Input value={form.creditor} onChange={(event) => setForm({ ...form, creditor: event.target.value })} required /></Field>
+          <Field label="Valor"><MoneyInput value={form.amount} onValueChange={(value) => setForm({ ...form, amount: value })} required /></Field>
+          <Field label="Valor pago"><MoneyInput value={form.paid_amount} onValueChange={(value) => setForm({ ...form, paid_amount: value })} /></Field>
+          <Field label="Prazo de pagamento"><Input value={form.due_date} onChange={(event) => setForm({ ...form, due_date: event.target.value })} type="date" /></Field>
+          <Field label="Descrição"><Input value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} /></Field>
+          {error && <p className="text-sm text-pink-200">{error}</p>}
+          <Button type="submit">Salvar dívida</Button>
+        </form>
+        <DataList items={data.debts} empty="Nenhuma dívida cadastrada." render={(debt) => {
+          const completed = toNumber(debt.remaining) <= 0 || debt.status === "paid";
+          const days = daysUntilDate(debt.due_date);
+          const urgent = !completed && days !== null && days >= 0 && days <= 7;
+          return (
+            <div key={debt.id} className={cn("grid gap-3 rounded-md p-3 sm:grid-cols-[1fr_auto] sm:items-center", urgent ? "bg-amber-400/10 ring-1 ring-amber-400/30" : "bg-white/[0.04]")}>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium text-white">{debt.creditor}</p>
+                <p className="truncate text-xs text-slate-400">
+                  {completed ? "Completa" : `Restante: ${formatCurrency(toNumber(debt.remaining))}`}
+                </p>
+                {urgent && <p className="mt-1 text-xs text-amber-100">Aviso: prazo chegando em {days} dia(s).</p>}
+              </div>
+              <div className="flex items-center justify-between gap-2 sm:justify-end">
+                <strong className={cn("text-sm", completed ? "text-emerald-300" : "text-white")}>
+                  {formatCurrency(toNumber(debt.amount))}
+                </strong>
+                {!completed && (
+                  <Button type="button" variant="secondary" className="h-9 px-3" onClick={() => markDebtPaid(debt)}>
+                    Paga
+                  </Button>
+                )}
+                <Button type="button" variant="ghost" className="h-9 w-9 p-0" aria-label="Apagar dívida" onClick={() => removeDebt(debt)}>
+                  <Trash2 className="h-4 w-4" aria-hidden="true" />
                 </Button>
-              )}
-              <Button type="button" variant="ghost" className="h-9 w-9 p-0" aria-label="Apagar dívida" onClick={() => removeDebt(debt)}>
-                <Trash2 className="h-4 w-4" aria-hidden="true" />
-              </Button>
+              </div>
             </div>
+          );
+        }} />
+      </ResourcePage>
+
+      <section className="grid gap-6 lg:grid-cols-[1fr_360px]">
+        <Card className="p-5">
+          <h2 className="mb-4 text-lg font-semibold text-white">Cartão de crédito</h2>
+          <div className="mb-4 rounded-md border border-amber-400/30 bg-amber-400/10 p-3 text-sm text-amber-100">
+            Nunca informe número do cartão, CVV, senha ou dados completos. O app só precisa de apelido, limite, dívida e datas.
           </div>
-        );
-      }} />
-    </ResourcePage>
+          <DataList items={data.creditCards} empty="Nenhum cartão cadastrado." render={(card) => {
+            const debt = toNumber(card.current_debt);
+            const limit = toNumber(card.limit_amount);
+            const usage = limit > 0 ? (debt / limit) * 100 : 0;
+            const projected = debt * (1 + toNumber(card.interest_rate) / 100);
+            const nearLimit = usage >= 80;
+            const dueDays = daysUntilMonthDay(card.due_day);
+            const closeDays = daysUntilMonthDay(card.closing_day);
+            return (
+              <div key={card.id} className={cn("rounded-md p-3", nearLimit || dueDays <= 7 ? "bg-pink-400/10 ring-1 ring-pink-400/30" : "bg-white/[0.04]")}>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium text-white">{card.nickname}</p>
+                    <p className="text-xs text-slate-400">Fecha dia {card.closing_day}, vence dia {card.due_day}</p>
+                  </div>
+                  <Button type="button" variant="ghost" className="h-9 w-9 p-0" aria-label="Apagar cartão" onClick={() => removeCreditCard(card)}>
+                    <Trash2 className="h-4 w-4" aria-hidden="true" />
+                  </Button>
+                </div>
+                <div className="mt-3 space-y-2">
+                  <Progress value={Math.min(100, usage)} />
+                  <p className="text-xs text-slate-300">Fatura: {formatCurrency(debt)} de {formatCurrency(limit)} ({usage.toFixed(0)}% do limite)</p>
+                  <p className="text-xs text-slate-400">Com juros informado, pode virar {formatCurrency(projected)}.</p>
+                  {(nearLimit || dueDays <= 7 || closeDays <= 7) && (
+                    <p className="rounded-md bg-black/20 p-2 text-xs text-pink-100">
+                      Aviso: cartão perto do limite ou da data. Isso pode reduzir seu saldo livre e aumentar juros se atrasar.
+                    </p>
+                  )}
+                </div>
+              </div>
+            );
+          }} />
+        </Card>
+
+        <Card className="p-5">
+          <h2 className="mb-4 text-lg font-semibold text-white">Novo cartão</h2>
+          <form className="grid gap-3" onSubmit={submitCreditCard}>
+            <Field label="Apelido do cartão"><Input value={cardForm.nickname} onChange={(event) => setCardForm({ ...cardForm, nickname: event.target.value })} placeholder="Ex: Cartão principal" required /></Field>
+            <Field label="Quanto está devendo"><MoneyInput value={cardForm.current_debt} onValueChange={(value) => setCardForm({ ...cardForm, current_debt: value })} required /></Field>
+            <Field label="Limite total"><MoneyInput value={cardForm.limit_amount} onValueChange={(value) => setCardForm({ ...cardForm, limit_amount: value })} required /></Field>
+            <Field label="Juros ao mês (%)"><Input value={cardForm.interest_rate} onChange={(event) => setCardForm({ ...cardForm, interest_rate: event.target.value })} inputMode="decimal" /></Field>
+            <Field label="Dia que fecha"><Input value={cardForm.closing_day} onChange={(event) => setCardForm({ ...cardForm, closing_day: event.target.value })} type="number" min="1" max="31" required /></Field>
+            <Field label="Dia que vence"><Input value={cardForm.due_day} onChange={(event) => setCardForm({ ...cardForm, due_day: event.target.value })} type="number" min="1" max="31" required /></Field>
+            <Button type="submit">Salvar cartão</Button>
+          </form>
+        </Card>
+      </section>
+    </div>
   );
 }
 
@@ -1698,10 +1950,15 @@ function FixedExpensesPage({ data, refresh }: FormProps) {
         <Button type="submit">Salvar conta</Button>
       </form>
       <DataList items={data.fixedExpenses} empty="Nenhuma conta fixa cadastrada." render={(item) => (
-        <div key={item.id} className="flex items-center justify-between gap-3 rounded-md bg-white/[0.04] p-3">
+        <div key={item.id} className={cn("flex items-center justify-between gap-3 rounded-md p-3", !item.is_paid_this_month && daysUntilMonthDay(item.due_day) <= 7 ? "bg-amber-400/10 ring-1 ring-amber-400/30" : "bg-white/[0.04]")}>
           <div>
             <p className="font-medium text-white">{item.name}</p>
             <p className="text-xs text-slate-400">Vence dia {item.due_day} - {item.is_paid_this_month ? "Pago" : "Pendente"}</p>
+            {!item.is_paid_this_month && daysUntilMonthDay(item.due_day) <= 7 && (
+              <p className="mt-1 text-xs text-amber-100">
+                Aviso: vence em {daysUntilMonthDay(item.due_day)} dia(s). Seu saldo {toNumber(data.wallet?.balance) >= toNumber(item.amount) ? "cobre" : "não cobre"} esta conta.
+              </p>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <strong>{formatCurrency(toNumber(item.amount))}</strong>
@@ -2006,7 +2263,8 @@ function ProfilePage({
   user,
   onUserChange,
   onDeleteAccount,
-}: FormProps & { user: User; onUserChange: (user: User) => void; onDeleteAccount: () => void }) {
+  onPrivacyChange,
+}: FormProps & { user: User; onUserChange: (user: User) => void; onDeleteAccount: () => void; onPrivacyChange: (settings: ProfilePrivacySettings) => void }) {
   const profile = data.me ?? user;
   const featuredStorageKey = `finance-couple:featured-badges:${profile.id}`;
   const [tab, setTab] = useState<"overview" | "settings" | "badges">("overview");
@@ -2015,7 +2273,10 @@ function ProfilePage({
   const [avatar, setAvatar] = useState<string | null>(profile.avatar);
   const [avatarLabel, setAvatarLabel] = useState(profile.avatar ? "Imagem atual" : "Nenhum arquivo selecionado");
   const [featuredBadgeIds, setFeaturedBadgeIds] = useState<string[]>([]);
-  const [privacySettings, setPrivacySettings] = useState<ProfilePrivacySettings>(() => readProfilePrivacy(profile.id));
+  const [privacySettings, setPrivacySettings] = useState<ProfilePrivacySettings>({
+    showGroupOnProfile: true,
+    showMembershipOnOtherProfiles: true,
+  });
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState("");
@@ -2047,8 +2308,28 @@ function ProfilePage({
   }, [featuredBadgeIds, featuredStorageKey]);
 
   useEffect(() => {
-    setPrivacySettings(readProfilePrivacy(profile.id));
-  }, [profile.id]);
+    let cancelled = false;
+    void api.get<ApiResponse<{ show_group_on_profile: boolean; show_membership_on_other_profiles: boolean }>>("/users/me/privacy/")
+      .then((response) => {
+        if (cancelled) return;
+        setPrivacySettings({
+          showGroupOnProfile: response.data.data.show_group_on_profile,
+          showMembershipOnOtherProfiles: response.data.data.show_membership_on_other_profiles,
+        });
+        onPrivacyChange({
+          showGroupOnProfile: response.data.data.show_group_on_profile,
+          showMembershipOnOtherProfiles: response.data.data.show_membership_on_other_profiles,
+        });
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setPrivacySettings({ showGroupOnProfile: true, showMembershipOnOtherProfiles: true });
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [onPrivacyChange, profile.id]);
 
   const profileAchievementStats = useMemo(
     () => ({
@@ -2126,14 +2407,14 @@ function ProfilePage({
 
   async function updatePrivacySettings(nextSettings: ProfilePrivacySettings) {
     setPrivacySettings(nextSettings);
-    saveProfilePrivacy(profile.id, nextSettings);
+    onPrivacyChange(nextSettings);
     try {
       await api.patch("/users/me/privacy/", {
         show_group_on_profile: nextSettings.showGroupOnProfile,
         show_membership_on_other_profiles: nextSettings.showMembershipOnOtherProfiles,
       });
-    } catch {
-      // Backend persistence is optional for now; local settings keep the UI behavior.
+    } catch (err) {
+      setError(apiErrorMessage(err));
     }
   }
 
@@ -2450,12 +2731,14 @@ function PublicProfileModal({
   currentUser,
   localBadges,
   currentGroup,
+  currentUserPrivacy,
   onClose,
 }: {
   profileId: string | null;
   currentUser: User;
   localBadges: BadgeAward[];
   currentGroup: CoupleGroup | null;
+  currentUserPrivacy: ProfilePrivacySettings;
   onClose: () => void;
 }) {
   const [profile, setProfile] = useState<PublicProfile | null>(null);
@@ -2498,7 +2781,6 @@ function PublicProfileModal({
   const badges = profile?.id === currentUser.id
     ? localBadges.filter((item) => localFeaturedBadgeIds.includes(item.id))
     : profile?.featured_badges ?? [];
-  const currentUserPrivacy = readProfilePrivacy(currentUser.id);
   const visibleGroup = profile?.id === currentUser.id
     ? currentUserPrivacy.showGroupOnProfile ? profile.public_group ?? currentGroup : null
     : profile?.show_group_on_profile ? profile.public_group : null;
@@ -2636,54 +2918,73 @@ function SocialPage({ ranking, user, onViewProfile }: { ranking: RankingItem[]; 
 }
 
 function FriendsPage({ ranking, user, onViewProfile }: { ranking: RankingItem[]; user: User; onViewProfile: (userId: string) => void }) {
-  const [friends, setFriends] = useState<LocalFriend[]>(() => readLocalFriends(user.id));
-  const [nudges, setNudges] = useState<ScheduledNudge[]>(() => readScheduledNudges(user.id));
+  const [friends, setFriends] = useState<LocalFriend[]>([]);
+  const [nudges, setNudges] = useState<ScheduledNudge[]>([]);
   const [selectedFriendId, setSelectedFriendId] = useState("");
   const [message, setMessage] = useState("Continue, você está indo muito bem!");
   const [delayMinutes, setDelayMinutes] = useState("30");
   const [status, setStatus] = useState("");
+  const [loadingCommunity, setLoadingCommunity] = useState(false);
   const acceptedFriends = friends.filter((friend) => friend.status === "accepted");
   const pendingFriends = friends.filter((friend) => friend.status === "pending");
+  const friendLeaderboard = [...acceptedFriends].sort((a, b) => b.total_xp - a.total_xp);
+  const suggestedCheer = friendLeaderboard[0];
   const discoverable = ranking
     .filter((item) => item.user.id !== user.id)
     .filter((item) => !friends.some((friend) => friend.id === item.user.id));
 
-  function persistFriends(nextFriends: LocalFriend[]) {
-    setFriends(nextFriends);
-    saveLocalFriends(user.id, nextFriends);
-  }
+  const loadCommunity = useCallback(async () => {
+    setLoadingCommunity(true);
+    setStatus("");
+    try {
+      const [friendsResponse, nudgesResponse] = await Promise.all([
+        api.get<ApiResponse<LocalFriend[]>>("/community/friends/").then((response) => response.data),
+        api.get<ApiResponse<ScheduledNudge[]>>("/community/nudges/").then((response) => response.data),
+      ]);
+      setFriends(friendsResponse.data);
+      setNudges(nudgesResponse.data);
+    } catch (err) {
+      setStatus(apiErrorMessage(err));
+    } finally {
+      setLoadingCommunity(false);
+    }
+  }, []);
 
-  function persistNudges(nextNudges: ScheduledNudge[]) {
-    setNudges(nextNudges);
-    saveScheduledNudges(user.id, nextNudges);
-  }
+  useEffect(() => {
+    void loadCommunity();
+  }, [loadCommunity]);
 
   async function sendFriendRequest(target: User) {
-    const nextFriend: LocalFriend = {
-      id: target.id,
-      name: target.name,
-      avatar: target.avatar,
-      total_xp: target.total_xp,
-      status: "pending",
-      created_at: new Date().toISOString(),
-    };
-    persistFriends([nextFriend, ...friends]);
-    setStatus(`Pedido enviado para ${target.name}.`);
+    setStatus("");
     try {
       await api.post("/community/friend-requests/", { to_user_id: target.id });
+      setStatus(`Pedido enviado para ${target.name}.`);
+      await loadCommunity();
     } catch {
-      setStatus(`Pedido salvo localmente. O backend ainda precisa confirmar o envio para ${target.name}.`);
+      setStatus(`Não foi possível enviar o pedido para ${target.name}.`);
     }
   }
 
-  function acceptLocalFriend(friend: LocalFriend) {
-    persistFriends(friends.map((item) => item.id === friend.id ? { ...item, status: "accepted" } : item));
-    setStatus(`${friend.name} agora aparece como amizade.`);
+  async function acceptFriend(friend: LocalFriend) {
+    setStatus("");
+    try {
+      await api.post(`/community/friend-requests/${friend.id}/accept/`);
+      setStatus(`${friend.name} agora aparece como amizade.`);
+      await loadCommunity();
+    } catch (err) {
+      setStatus(apiErrorMessage(err));
+    }
   }
 
-  function removeFriend(friend: LocalFriend) {
-    persistFriends(friends.filter((item) => item.id !== friend.id));
-    setStatus(`${friend.name} removido da lista local.`);
+  async function removeFriend(friend: LocalFriend) {
+    setStatus("");
+    try {
+      await api.delete(`/community/friends/${friend.id}/`);
+      setStatus(`${friend.name} removido da lista.`);
+      await loadCommunity();
+    } catch (err) {
+      setStatus(apiErrorMessage(err));
+    }
   }
 
   async function sendNudge(event: FormEvent<HTMLFormElement>) {
@@ -2691,30 +2992,39 @@ function FriendsPage({ ranking, user, onViewProfile }: { ranking: RankingItem[];
     const friend = friends.find((item) => item.id === selectedFriendId);
     if (!friend || !message.trim()) return;
     const deliverAt = new Date(Date.now() + Number(delayMinutes) * 60 * 1000).toISOString();
-    const nextNudge: ScheduledNudge = {
-      id: crypto.randomUUID(),
-      to_user_id: friend.id,
-      to_name: friend.name,
-      message: message.trim(),
-      deliver_at: deliverAt,
-      created_at: new Date().toISOString(),
-    };
-    persistNudges([nextNudge, ...nudges]);
-    setStatus(`Incentivo agendado para ${friend.name}.`);
     try {
       await api.post("/community/nudges/", {
         to_user_id: friend.id,
-        message: nextNudge.message,
-        deliver_at: nextNudge.deliver_at,
+        message: message.trim(),
+        deliver_at: deliverAt,
       });
+      setStatus(`Incentivo agendado para ${friend.name}.`);
+      await loadCommunity();
     } catch {
-      setStatus(`Incentivo salvo localmente. O backend ainda precisa entregar a notificação no horário.`);
+      setStatus("Não foi possível agendar o incentivo.");
     }
   }
 
   return (
     <div className="grid gap-6">
+      {loadingCommunity && <p className="rounded-md bg-white/[0.04] p-3 text-sm text-slate-300">Carregando comunidade...</p>}
       {status && <p className="rounded-md bg-white/[0.04] p-3 text-sm text-slate-300">{status}</p>}
+      <section className="grid gap-4 md:grid-cols-3">
+        <Card className="p-4">
+          <p className="text-sm text-slate-400">Amigos</p>
+          <p className="mt-2 text-2xl font-semibold text-white">{acceptedFriends.length}</p>
+        </Card>
+        <Card className="p-4">
+          <p className="text-sm text-slate-400">Pedidos</p>
+          <p className="mt-2 text-2xl font-semibold text-white">{pendingFriends.length}</p>
+        </Card>
+        <Card className="p-4">
+          <p className="text-sm text-slate-400">Sugestão social</p>
+          <p className="mt-2 text-sm font-medium text-white">
+            {suggestedCheer ? `Parabenize ${suggestedCheer.name}` : "Adicione amigos para receber sugestões."}
+          </p>
+        </Card>
+      </section>
       <section className="grid gap-6 lg:grid-cols-[1fr_360px]">
         <Card className="p-5">
           <h2 className="mb-4 text-lg font-semibold text-white">Amigos</h2>
@@ -2751,7 +3061,7 @@ function FriendsPage({ ranking, user, onViewProfile }: { ranking: RankingItem[];
                     <p className="text-xs text-slate-400">Aguardando confirmação</p>
                   </div>
                   <div className="flex gap-2">
-                    <Button type="button" variant="secondary" className="h-9 px-3" onClick={() => acceptLocalFriend(friend)}>Marcar amigo</Button>
+                    <Button type="button" variant="secondary" className="h-9 px-3" onClick={() => void acceptFriend(friend)}>Aceitar</Button>
                     <Button type="button" variant="ghost" className="h-9 px-3" onClick={() => removeFriend(friend)}>Cancelar</Button>
                   </div>
                 </div>
@@ -2871,6 +3181,10 @@ export function App() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
+  const [userPrivacy, setUserPrivacy] = useState<ProfilePrivacySettings>({
+    showGroupOnProfile: true,
+    showMembershipOnOtherProfiles: true,
+  });
   const [openNavSections, setOpenNavSections] = useState<Record<string, boolean>>({
     overview: true,
     money: true,
@@ -2960,6 +3274,9 @@ export function App() {
         api.get<ApiResponse<XPHistory[]>>("/gamification/xp/").then(r => r.data),
         api.get<ApiResponse<RankingItem[]>>("/gamification/ranking/").then(r => r.data),
       ]);
+      const creditCards = await api.get<ApiResponse<CreditCardAccount[]>>("/credit-cards/")
+        .then(r => r.data.data)
+        .catch(() => [] as CreditCardAccount[]);
 
       const group = isCoupleGroup(couple.data) ? couple.data : null;
       updateSessionUser(me.data);
@@ -2977,6 +3294,7 @@ export function App() {
         investments: readInvestments(me.data.id),
         debts: debts.data,
         fixedExpenses: fixedExpenses.data,
+        creditCards,
         badges: badges.data,
         xpHistory: xpHistory.data,
         ranking: ranking.data,
@@ -3181,7 +3499,7 @@ export function App() {
           {page === "fixed" && <FixedExpensesPage data={data} refresh={loadData} />}
           {page === "couple" && <CouplePage data={data} refresh={loadData} user={session.user} onViewProfile={setSelectedProfileId} />}
           {page === "achievements" && <AchievementsPage data={data} user={session.user} />}
-          {page === "profile" && <ProfilePage data={data} refresh={loadData} user={session.user} onUserChange={(updated) => setSession((current) => (current ? { ...current, user: updated } : current))} onDeleteAccount={logout} />}
+          {page === "profile" && <ProfilePage data={data} refresh={loadData} user={session.user} onUserChange={(updated) => setSession((current) => (current ? { ...current, user: updated } : current))} onDeleteAccount={logout} onPrivacyChange={setUserPrivacy} />}
           {page === "social" && <SocialPage ranking={data.ranking} user={session.user} onViewProfile={setSelectedProfileId} />}
           {page === "friends" && <FriendsPage ranking={data.ranking} user={session.user} onViewProfile={setSelectedProfileId} />}
           <footer className="mt-10 border-t border-white/10 py-5 text-center text-xs text-slate-500">
@@ -3203,6 +3521,7 @@ export function App() {
         currentUser={session.user}
         localBadges={data.badges}
         currentGroup={data.couple}
+        currentUserPrivacy={userPrivacy}
         onClose={() => setSelectedProfileId(null)}
       />
     </div>

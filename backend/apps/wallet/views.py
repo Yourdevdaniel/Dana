@@ -38,6 +38,28 @@ class SalaryListCreateView(generics.ListCreateAPIView):
         return success_response(data=SalarySerializer(salary).data, message="Salário registrado.", status=201)
 
 
+class SalaryDetailView(generics.RetrieveUpdateDestroyAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = SalarySerializer
+
+    def get_queryset(self):
+        return Salary.objects.filter(user=self.request.user)
+
+    def retrieve(self, request, *args, **kwargs):
+        return success_response(data=SalarySerializer(self.get_object()).data)
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop("partial", False)
+        serializer = self.get_serializer(self.get_object(), data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return success_response(data=SalarySerializer(serializer.instance).data, message="Salário atualizado.")
+
+    def destroy(self, request, *args, **kwargs):
+        self.get_object().delete()
+        return success_response(message="Salário removido.")
+
+
 class AdjustBalanceView(APIView):
     permission_classes = [IsAuthenticated]
 

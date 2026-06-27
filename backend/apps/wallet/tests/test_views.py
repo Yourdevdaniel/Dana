@@ -66,6 +66,59 @@ class TestSalaryView:
 
 
 @pytest.mark.django_db
+class TestSalaryDetailView:
+    def _url(self, pk):
+        return f"/api/wallet/salary/{pk}/"
+
+    def test_patch_amount(self, auth_client, user):
+        salary = Salary.objects.create(user=user, amount=Decimal("3000"), effective_date="2026-01-01")
+        r = auth_client.patch(self._url(salary.id), {"amount": "4000.00"})
+        assert r.status_code == 200
+        salary.refresh_from_db()
+        assert salary.amount == Decimal("4000.00")
+
+    def test_patch_effective_date(self, auth_client, user):
+        salary = Salary.objects.create(user=user, amount=Decimal("3000"), effective_date="2026-01-01")
+        r = auth_client.patch(self._url(salary.id), {"effective_date": "2026-06-01"})
+        assert r.status_code == 200
+        salary.refresh_from_db()
+        assert str(salary.effective_date) == "2026-06-01"
+
+    def test_patch_note(self, auth_client, user):
+        salary = Salary.objects.create(user=user, amount=Decimal("3000"), effective_date="2026-01-01")
+        r = auth_client.patch(self._url(salary.id), {"note": "Aumento anual"})
+        assert r.status_code == 200
+        salary.refresh_from_db()
+        assert salary.note == "Aumento anual"
+
+    def test_delete_salary(self, auth_client, user):
+        salary = Salary.objects.create(user=user, amount=Decimal("3000"), effective_date="2026-01-01")
+        r = auth_client.delete(self._url(salary.id))
+        assert r.status_code == 200
+        assert not Salary.objects.filter(pk=salary.id).exists()
+
+    def test_cannot_patch_other_users_salary(self, auth_client, db):
+        from apps.users.models import User
+        other = User.objects.create_user(email="other2@t.com", name="Other", password="pass1234")
+        salary = Salary.objects.create(user=other, amount=Decimal("5000"), effective_date="2026-01-01")
+        r = auth_client.patch(self._url(salary.id), {"amount": "9999.00"})
+        assert r.status_code in (403, 404)
+
+    def test_cannot_delete_other_users_salary(self, auth_client, db):
+        from apps.users.models import User
+        other = User.objects.create_user(email="other3@t.com", name="Other", password="pass1234")
+        salary = Salary.objects.create(user=other, amount=Decimal("5000"), effective_date="2026-01-01")
+        r = auth_client.delete(self._url(salary.id))
+        assert r.status_code in (403, 404)
+
+    def test_returns_envelope_format(self, auth_client, user):
+        salary = Salary.objects.create(user=user, amount=Decimal("3000"), effective_date="2026-01-01")
+        r = auth_client.patch(self._url(salary.id), {"note": "ok"})
+        assert "success" in r.data
+        assert "data" in r.data
+
+
+@pytest.mark.django_db
 class TestAdjustBalanceView:
     url = "/api/wallet/adjust-balance/"
 
