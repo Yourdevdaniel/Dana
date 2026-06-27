@@ -47,6 +47,8 @@ export type CoupleDashboardItem = {
   name: string;
   balance: string;
   net_worth: string;
+  investment_total?: string;
+  investment_current_value?: string;
   monthly_average_expense: string;
   recommended_reserve: string;
   monthly_trend: Array<{ year: number; month: number; income: string; expense: string }>;
@@ -130,6 +132,8 @@ export type FixedExpense = {
 export type Dashboard = {
   balance: string;
   net_worth: string;
+  investment_total?: string;
+  investment_current_value?: string;
   monthly_average_expense: string;
   recommended_reserve: string;
   monthly_trend: Array<{ year: number; month: number; income: string; expense: string }>;

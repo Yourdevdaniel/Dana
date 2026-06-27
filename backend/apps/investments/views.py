@@ -1,3 +1,6 @@
+import datetime
+
+from django.db import transaction as db_transaction
 from rest_framework import generics
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
@@ -7,7 +10,7 @@ from core.responses import success_response
 
 from . import services
 from .models import Investment
-from .serializers import InvestmentCreateSerializer, InvestmentSerializer
+from .serializers import InvestmentCreateSerializer, InvestmentSerializer, InvestmentUpdateSerializer
 
 
 class InvestmentListCreateView(generics.ListCreateAPIView):
@@ -25,12 +28,32 @@ class InvestmentListCreateView(generics.ListCreateAPIView):
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        investment = serializer.save(user=request.user)
+
+        with db_transaction.atomic():
+            investment = serializer.save(user=request.user)
+            self._debit_wallet(request.user, investment)
+
         return success_response(
             data=InvestmentSerializer(investment).data,
             message="Investimento registrado.",
             status=201,
         )
+
+    def _debit_wallet(self, user, investment):
+        from apps.wallet.services import WalletService
+        from apps.transactions.services import TransactionService
+        from apps.categories.models import Category
+
+        wallet = WalletService().get_or_create_wallet(user)
+        category = Category.objects.filter(is_system=True, type="expense").first()
+        TransactionService().create_transaction(user, {
+            "wallet": wallet,
+            "amount": investment.invested_amount,
+            "type": "expense",
+            "description": f"Investimento - {investment.name}",
+            "date": investment.purchase_date or datetime.date.today(),
+            "category": category,
+        })
 
 
 class InvestmentDetailView(generics.RetrieveUpdateDestroyAPIView):
@@ -40,7 +63,7 @@ class InvestmentDetailView(generics.RetrieveUpdateDestroyAPIView):
         return Investment.objects.filter(user=self.request.user)
 
     def get_serializer_class(self):
-        return InvestmentCreateSerializer if self.request.method in ("PUT", "PATCH") else InvestmentSerializer
+        return InvestmentUpdateSerializer if self.request.method in ("PUT", "PATCH") else InvestmentSerializer
 
     def retrieve(self, request, *args, **kwargs):
         return success_response(data=InvestmentSerializer(self.get_object()).data)

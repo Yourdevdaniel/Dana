@@ -78,7 +78,16 @@ class FinancialEngine:
             return "medium"
         return "low"
 
+    def investment_totals(self) -> dict:
+        from apps.investments.models import Investment
+        from django.db.models import Sum
+        qs = Investment.objects.filter(user=self.user)
+        invested = qs.aggregate(t=Sum("invested_amount"))["t"] or Decimal("0")
+        current = qs.aggregate(t=Sum("current_amount"))["t"] or Decimal("0")
+        return {"investment_total": invested, "investment_current_value": current}
+
     def summary(self) -> dict:
+        inv = self.investment_totals()
         return {
             "balance": self.balance(),
             "net_worth": self.net_worth(),
@@ -86,4 +95,6 @@ class FinancialEngine:
             "recommended_reserve": self.recommended_reserve(),
             "monthly_trend": self.monthly_trend(),
             "financial_risk": self.financial_risk_score(),
+            "investment_total": inv["investment_total"],
+            "investment_current_value": inv["investment_current_value"],
         }

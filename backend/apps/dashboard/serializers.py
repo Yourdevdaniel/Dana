@@ -15,3 +15,5 @@ class DashboardSerializer(serializers.Serializer):
     recommended_reserve = serializers.DecimalField(max_digits=12, decimal_places=2)
     monthly_trend = MonthlyTrendSerializer(many=True)
     financial_risk = serializers.CharField()
+    investment_total = serializers.DecimalField(max_digits=14, decimal_places=2)
+    investment_current_value = serializers.DecimalField(max_digits=14, decimal_places=2)

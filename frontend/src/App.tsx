@@ -156,6 +156,8 @@ type AppData = {
     name: string;
     balance: string;
     net_worth: string;
+    investment_total?: string;
+    investment_current_value?: string;
     monthly_average_expense: string;
     recommended_reserve: string;
     monthly_trend: Array<{ year: number; month: number; income: string; expense: string }>;
@@ -461,7 +463,7 @@ function NativeSelect(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
     <select
       {...props}
       className={cn(
-        "focus-ring h-11 w-full rounded-md border border-white/10 bg-surface px-3 text-sm text-white [color-scheme:dark] [&>option]:bg-surface [&>option]:text-white",
+        "focus-ring h-11 w-full rounded-md border border-white/10 bg-surface px-3 text-sm text-white transition-all duration-200 ease-out [color-scheme:dark] hover:border-white/20 hover:bg-white/[0.07] focus-visible:bg-white/[0.08] [&>option]:bg-surface [&>option]:text-white",
         props.className,
       )}
     />
@@ -485,7 +487,7 @@ function PageHelp({ page }: { page: Page }) {
         <span className="hidden sm:inline">Está com dúvida?</span>
       </Button>
       {open && (
-        <div className="absolute right-0 top-12 z-30 w-[min(22rem,calc(100vw-2rem))] rounded-md border border-white/10 bg-surface p-4 text-left shadow-soft">
+        <div className="ui-popover absolute right-0 top-12 z-30 w-[min(22rem,calc(100vw-2rem))] rounded-md border border-white/10 bg-surface p-4 text-left shadow-soft">
           <div className="flex items-start justify-between gap-3">
             <div>
               <h2 className="text-sm font-semibold text-white">{help.title}</h2>
@@ -540,6 +542,17 @@ function MoneyInput({
       onChange={(event) => onValueChange(currencyInputToDecimal(event.target.value))}
       placeholder={props.placeholder ?? "R$ 0,00"}
     />
+  );
+}
+
+function investmentTotals(items: Investment[]) {
+  return items.reduce(
+    (acc, item) => {
+      acc.invested += toNumber(item.invested_amount);
+      acc.current += toNumber(item.current_amount);
+      return acc;
+    },
+    { invested: 0, current: 0 },
   );
 }
 
@@ -703,16 +716,17 @@ function AuthScreen({
 }
 
 
-function MetricGrid({ dashboard }: { dashboard: Dashboard | null }) {
+function MetricGrid({ dashboard, investmentValue = 0 }: { dashboard: Dashboard | null; investmentValue?: number }) {
   const metrics = [
     { label: "Saldo", value: dashboard?.balance, icon: CircleDollarSign, tone: "text-emerald-300" },
     { label: "Patrimônio", value: dashboard?.net_worth, icon: Banknote, tone: "text-sky-300" },
-    { label: "Gasto médio", value: dashboard?.monthly_average_expense, icon: CreditCard, tone: "text-pink-300" },
+    { label: "Investido", value: investmentValue || dashboard?.investment_current_value || dashboard?.investment_total, icon: Landmark, tone: "text-teal-300" },
     { label: "Reserva ideal", value: dashboard?.recommended_reserve, icon: ShieldCheck, tone: "text-violet-300" },
+    { label: "Gasto médio", value: dashboard?.monthly_average_expense, icon: CreditCard, tone: "text-pink-300" },
   ];
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
       {metrics.map((metric) => (
         <Card key={metric.label} className="p-4">
           <div className="flex items-start justify-between gap-3">
@@ -785,10 +799,16 @@ function DashboardPage({
 }) {
   const coupleSummary = summarizeCouple(data.coupleDashboard);
   const activeDashboard = mode === "solo" ? data.dashboard : coupleSummary ?? data.dashboard;
+  const personalInvestments = investmentTotals(data.investments);
+  const coupleInvestmentCurrent = data.coupleDashboard.reduce(
+    (total, item) => total + toNumber(item.investment_current_value ?? item.investment_total),
+    0,
+  );
+  const dashboardInvestmentValue = mode === "couple" ? coupleInvestmentCurrent || personalInvestments.current : personalInvestments.current;
 
   return (
     <div className="grid gap-6">
-      <Card className="bg-[radial-gradient(circle_at_top_left,rgba(124,58,237,.35),transparent_34%),linear-gradient(135deg,rgba(37,99,235,.2),rgba(236,72,153,.08))] p-6 md:p-8">
+      <Card className="ui-hero-glow bg-[radial-gradient(circle_at_top_left,rgba(124,58,237,.35),transparent_34%),linear-gradient(135deg,rgba(37,99,235,.2),rgba(236,72,153,.08))] p-6 md:p-8">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <p className="text-sm font-medium text-sky-200">
@@ -834,7 +854,7 @@ function DashboardPage({
       {mode === "solo" ? (
         <>
           <DeadlineAlerts data={data} />
-          <MetricGrid dashboard={data.dashboard} />
+          <MetricGrid dashboard={data.dashboard} investmentValue={dashboardInvestmentValue} />
           <section className="grid gap-6 xl:grid-cols-[1fr_380px]">
             <CashflowChart dashboard={data.dashboard} />
             <div className="grid gap-6">
@@ -848,7 +868,7 @@ function DashboardPage({
       ) : (
         <>
           <DeadlineAlerts data={data} />
-          <MetricGrid dashboard={activeDashboard} />
+          <MetricGrid dashboard={activeDashboard} investmentValue={dashboardInvestmentValue} />
           <section className="grid gap-6 xl:grid-cols-[1fr_380px]">
             <CoupleSummaryPanel items={data.coupleDashboard} />
             <div className="grid gap-6">
@@ -870,6 +890,8 @@ function summarizeCouple(items: AppData["coupleDashboard"]): Dashboard | null {
     (acc, item) => {
       acc.balance += toNumber(item.balance);
       acc.net_worth += toNumber(item.net_worth);
+      acc.investment_total += toNumber(item.investment_total);
+      acc.investment_current_value += toNumber(item.investment_current_value ?? item.investment_total);
       acc.monthly_average_expense += toNumber(item.monthly_average_expense);
       acc.recommended_reserve += toNumber(item.recommended_reserve);
       acc.financial_risk = acc.financial_risk === "critical" || item.financial_risk === "critical"
@@ -880,6 +902,8 @@ function summarizeCouple(items: AppData["coupleDashboard"]): Dashboard | null {
     {
       balance: 0,
       net_worth: 0,
+      investment_total: 0,
+      investment_current_value: 0,
       monthly_average_expense: 0,
       recommended_reserve: 0,
       financial_risk: "low",
@@ -889,6 +913,8 @@ function summarizeCouple(items: AppData["coupleDashboard"]): Dashboard | null {
   return {
     balance: String(combined.balance),
     net_worth: String(combined.net_worth),
+    investment_total: String(combined.investment_total),
+    investment_current_value: String(combined.investment_current_value),
     monthly_average_expense: String(combined.monthly_average_expense / items.length),
     recommended_reserve: String(combined.recommended_reserve / items.length),
     monthly_trend: firstTrend,
@@ -911,6 +937,7 @@ function CoupleSummaryPanel({ items }: { items: AppData["coupleDashboard"] }) {
               <div className="mt-2 grid grid-cols-2 gap-3 text-sm">
                 <span>Saldo: {formatCurrency(toNumber(item.balance))}</span>
                 <span>XP financeiro: {formatCurrency(toNumber(item.net_worth))}</span>
+                <span>Investido: {formatCurrency(toNumber(item.investment_current_value ?? item.investment_total))}</span>
               </div>
             </div>
           ))}
@@ -1511,7 +1538,7 @@ function GoalsPage({ data, refresh }: FormProps) {
   );
 }
 
-function InvestmentsPage({ data, user }: { data: AppData; user: User }) {
+function InvestmentsPage({ data, user, refresh }: { data: AppData; user: User; refresh: () => Promise<void> }) {
   const [items, setItems] = useState<Investment[]>(() => data.investments);
   const [form, setForm] = useState({
     name: "",
@@ -1533,7 +1560,7 @@ function InvestmentsPage({ data, user }: { data: AppData; user: User }) {
     saveInvestments(user.id, nextItems);
   }
 
-  function submit(event: FormEvent<HTMLFormElement>) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const invested = toNumber(form.invested_amount);
     const current = toNumber(form.current_amount || form.invested_amount);
@@ -1545,21 +1572,40 @@ function InvestmentsPage({ data, user }: { data: AppData; user: User }) {
     }
 
     setError("");
+    if (!data.wallet) {
+      setError("A carteira ainda não foi criada.");
+      return;
+    }
+
     const next: Investment = {
       id: crypto.randomUUID(),
       ...form,
       current_amount: form.current_amount || form.invested_amount,
     };
-    persist([next, ...items]);
-    setForm({
-      name: "",
-      type: "renda_fixa",
-      institution: "",
-      invested_amount: "",
-      current_amount: "",
-      monthly_contribution: "0",
-      purchase_date: today(),
-    });
+    try {
+      await api.post("/transactions/", {
+        amount: form.invested_amount,
+        type: "expense",
+        description: `Investimento - ${form.name}`,
+        date: form.purchase_date,
+        is_recurring: false,
+        category: null,
+        wallet: data.wallet.id,
+      });
+      persist([next, ...items]);
+      setForm({
+        name: "",
+        type: "renda_fixa",
+        institution: "",
+        invested_amount: "",
+        current_amount: "",
+        monthly_contribution: "0",
+        purchase_date: today(),
+      });
+      await refresh();
+    } catch (err) {
+      setError(apiErrorMessage(err));
+    }
   }
 
   function removeInvestment(id: string) {
@@ -2817,8 +2863,8 @@ function PublicProfileModal({
     : profile?.show_group_on_profile ? profile.public_group : null;
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 px-4 py-8" role="dialog" aria-modal="true">
-      <Card className="w-full max-w-lg p-5">
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 px-4 py-8 backdrop-blur-sm" role="dialog" aria-modal="true">
+      <Card className="ui-modal w-full max-w-lg p-5">
         <div className="mb-5 flex items-start justify-between gap-4">
           <div>
             <p className="text-sm text-slate-400">Perfil público</p>
@@ -3200,7 +3246,7 @@ function ResourcePage({ title, formTitle, children }: { title: string; formTitle
 }
 
 function DataList<T>({ items, empty, render }: { items: T[]; empty: string; render: (item: T) => ReactNode }) {
-  return items.length ? <div className="space-y-3">{items.map(render)}</div> : <EmptyState title={empty} />;
+  return items.length ? <div className="ui-list space-y-3">{items.map(render)}</div> : <EmptyState title={empty} />;
 }
 
 export function App() {
@@ -3517,7 +3563,7 @@ export function App() {
           </div>
         </header>
 
-        <div className="mx-auto max-w-7xl px-4 py-5 md:px-6 lg:px-8">
+        <div className="ui-page mx-auto max-w-7xl px-4 py-5 md:px-6 lg:px-8">
           {loading && <p className="mb-4 rounded-md bg-white/[0.04] p-3 text-sm text-slate-300">Carregando dados...</p>}
           {error && <p className="mb-4 rounded-md bg-pink-500/10 p-3 text-sm text-pink-200">{error}</p>}
           {page === "dashboard" && <DashboardPage data={data} setPage={setPage} mode={dashboardMode} setMode={setDashboardMode} />}
@@ -3525,7 +3571,7 @@ export function App() {
           {page === "transactions" && <TransactionsPage data={data} refresh={loadData} />}
           {page === "categories" && <CategoriesPage data={data} refresh={loadData} />}
           {page === "goals" && <GoalsPage data={data} refresh={loadData} />}
-          {page === "investments" && <InvestmentsPage data={data} user={session.user} />}
+          {page === "investments" && <InvestmentsPage data={data} user={session.user} refresh={loadData} />}
           {page === "debts" && <DebtsPage data={data} refresh={loadData} />}
           {page === "fixed" && <FixedExpensesPage data={data} refresh={loadData} />}
           {page === "couple" && <CouplePage data={data} refresh={loadData} user={session.user} onViewProfile={setSelectedProfileId} />}

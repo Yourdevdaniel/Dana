@@ -57,3 +57,28 @@ class InvestmentCreateSerializer(serializers.ModelSerializer):
         if "current_amount" not in attrs or attrs.get("current_amount") is None:
             attrs["current_amount"] = attrs.get("invested_amount", 0)
         return attrs
+
+
+class InvestmentUpdateSerializer(serializers.ModelSerializer):
+    """invested_amount é bloqueado após criação — editar valor requer evento de resgate/aporte."""
+
+    class Meta:
+        model = Investment
+        fields = [
+            "name",
+            "asset_type",
+            "institution",
+            "current_amount",
+            "monthly_contribution",
+            "purchase_date",
+        ]
+
+    def validate_current_amount(self, value):
+        if value < 0:
+            raise serializers.ValidationError("Valor atual não pode ser negativo.")
+        return value
+
+    def validate_monthly_contribution(self, value):
+        if value < 0:
+            raise serializers.ValidationError("Aporte mensal não pode ser negativo.")
+        return value
